@@ -76,7 +76,7 @@ class QuadraticFuncModule : MathModule {
         var extraAns = ""
         if (xEval != null) {
             val yEval = a * xEval * xEval + b * xEval + c
-            steps.add("7. Nilai fungsi di x = ${xEval.toFracString()}: y = ${yEval.toFracString()}")
+            steps.add("7. Nilai fungsi di x = ${xEval.toFracString()}: f(${xEval.toFracString()}) = ${yEval.toFracString()}")
             extraAns = "; f(${xEval.toFracString()}) = ${yEval.toFracString()}"
         }
 

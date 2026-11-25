@@ -24,7 +24,20 @@ jobs:
           gradle-version: "8.9"
 
       - name: Run unit tests & build debug APK
-        run: gradle testDebugUnitTest assembleDebug --stacktrace --console=plain
+        shell: bash
+        run: |
+          set -o pipefail
+          gradle testDebugUnitTest assembleDebug --stacktrace --console=plain 2>&1 | tee gradle-build.log
+
+      - name: Upload failure diagnostics
+        if: failure()
+        uses: actions/upload-artifact@v4
+        with:
+          name: gradle-failure-logs
+          path: |
+            gradle-build.log
+            app/build/reports/tests/testDebugUnitTest/
+          if-no-files-found: ignore
 
       - name: Upload APK
         uses: actions/upload-artifact@v4
