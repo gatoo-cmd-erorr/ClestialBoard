@@ -139,7 +139,7 @@ class CurvedSolidModule : MathModule {
             val t = secondVal
             tSurd = QuadraticSurd(t, ExactFraction.ZERO, BigInteger.ONE)
             val sSq = r * r + t * t
-            sSurd = ExactMath.simplifyFractionSqrt(sSq)
+            sSurd = ExactMath.simplifyFractionSqrt(sSq).normalized()
             steps.add("Kerucut: r = ${r.toFracString()}, t = ${t.toFracString()}")
             steps.add("1. Garis pelukis: s = √(r² + t²) = √(${(r * r).toFracString()} + ${(t * t).toFracString()}) = √(${sSq.toFracString()}) = ${sSurd.format()}")
         } else {
@@ -147,7 +147,7 @@ class CurvedSolidModule : MathModule {
             if (s <= r) return SolveResult.fail("Garis pelukis (s) harus lebih panjang dari jari-jari (r).")
             sSurd = QuadraticSurd(s, ExactFraction.ZERO, BigInteger.ONE)
             val tSq = s * s - r * r
-            tSurd = ExactMath.simplifyFractionSqrt(tSq)
+            tSurd = ExactMath.simplifyFractionSqrt(tSq).normalized()
             steps.add("Kerucut: r = ${r.toFracString()}, s = ${s.toFracString()}")
             steps.add("1. Tinggi kerucut: t = √(s² - r²) = √(${(s * s).toFracString()} - ${(r * r).toFracString()}) = √(${tSq.toFracString()}) = ${tSurd.format()}")
         }

@@ -56,7 +56,7 @@ class QuadraticFuncModule : MathModule {
                 "(${xp.toFracString()}, 0)"
             }
             else -> {
-                val sqrtD = ExactMath.simplifyFractionSqrt(disc)
+                val sqrtD = ExactMath.simplifyFractionSqrt(disc).normalized()
                 val twoA = ExactFraction.of(2) * a
                 if (sqrtD.isPureRational) {
                     val r1 = xp + sqrtD.rational / twoA

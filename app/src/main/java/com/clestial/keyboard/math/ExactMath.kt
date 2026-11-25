@@ -284,7 +284,11 @@ object ExactMath {
         val product = f.num.multiply(f.den)
         val (outer, inner) = simplifySqrt(product)
         val coeff = ExactFraction.of(outer, f.den)
-        return QuadraticSurd(ExactFraction.ZERO, coeff, inner)
+        return if (inner == BigInteger.ONE) {
+            QuadraticSurd(coeff, ExactFraction.ZERO, BigInteger.ONE)
+        } else {
+            QuadraticSurd(ExactFraction.ZERO, coeff, inner)
+        }
     }
 
     /** Format bilangan √n yang sudah disederhanakan: 6√2, 3, atau √5. */

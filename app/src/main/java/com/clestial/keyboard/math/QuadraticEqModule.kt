@@ -76,7 +76,7 @@ class QuadraticEqModule : MathModule {
         }
 
         // D > 0
-        val sqrtD = ExactMath.simplifyFractionSqrt(disc)
+        val sqrtD = ExactMath.simplifyFractionSqrt(disc).normalized()
         val twoA = ExactFraction.of(2) * a
         val center = b.negate() / twoA
 
