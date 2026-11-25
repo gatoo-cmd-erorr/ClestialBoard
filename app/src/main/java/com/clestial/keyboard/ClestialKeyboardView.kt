@@ -4230,7 +4230,6 @@ class ClestialKeyboardView(context: Context) : View(context) {
 
     private fun javaHeaderGeo(): JavaHeaderGeo {
         val t = trHeaderGeo()
-        val landscape = trIsLandscape()
         val barRowH = t.back.height()
         val margin = clipMargin()
         val hGap = dp(6f)

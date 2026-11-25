@@ -437,10 +437,10 @@ class LinearLineModule : MathModule {
         val pair1 = parseFunctionSampleOrPoint(rawT1)
         val pair2 = parseFunctionSampleOrPoint(rawT2)
         val hasExplicitSample = rawT1.contains("=") || rawT2.contains("=")
-        val preferSamples = (pair1 != null && pair2 != null) &&
-            (rawFn.isEmpty() || hasExplicitSample || rawFn == DEFAULT_LINE_SAMPLE)
 
-        if (preferSamples) {
+        if (pair1 != null && pair2 != null &&
+            (rawFn.isEmpty() || hasExplicitSample || rawFn == DEFAULT_LINE_SAMPLE)
+        ) {
             // Mode menentukan a & b dari f(p) = vp dan f(q) = vq
             val (p, vp) = pair1
             val (q, vq) = pair2

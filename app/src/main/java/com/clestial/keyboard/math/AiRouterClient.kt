@@ -55,25 +55,26 @@ object AiRouterClient {
     }
 
     /**
-     * Validasi murni (dapat diuji unit tanpa jaringan):
+     * Validasi murni (dapat diuji unit tanpa jaringan & tanpa org.json Android):
      * Memastikan JSON memiliki skema {"modul": "...", "input": {...}},
      * modul ada di [MathRegistry], dan seluruh nilai input lolos validasi modul.
      */
     fun validateAiModuleJson(rawJson: String): ParsedMathIntent {
-        val obj = extractJsonObject(rawJson)
+        val obj = extractJsonMap(rawJson)
             ?: return ParsedMathIntent(
                 ok = false,
                 error = "Respons AI bukan JSON yang valid. Silakan pilih modul dan isi angka secara manual."
             )
 
-        val moduleId = obj.optString("modul", "").trim()
+        val moduleId = (obj["modul"] as? String)?.trim().orEmpty()
         val module = MathRegistry.find(moduleId)
             ?: return ParsedMathIntent(
                 ok = false,
                 error = "Modul \"$moduleId\" tidak dikenali di registry. Silakan pilih modul secara manual."
             )
 
-        val inputObj = obj.optJSONObject("input")
+        @Suppress("UNCHECKED_CAST")
+        val inputObj = obj["input"] as? Map<String, Any?>
             ?: return ParsedMathIntent(
                 ok = false,
                 error = "Data input dari AI tidak lengkap. Silakan isi angka secara manual."
@@ -81,18 +82,15 @@ object AiRouterClient {
 
         val allowedKeys = module.fields.map { it.key }.toSet()
         val cleanInputs = LinkedHashMap<String, String>()
-        val keys = inputObj.keys()
-        while (keys.hasNext()) {
-            val k = keys.next()
+        for ((k, v) in inputObj) {
             if (k !in allowedKeys) continue
-            val v = inputObj.opt(k) ?: continue
-            if (v is JSONObject || v is JSONArray) {
+            if (v is Map<*, *> || v is List<*>) {
                 return ParsedMathIntent(
                     ok = false,
                     error = "Format nilai \"$k\" dari AI tidak valid. Silakan isi manual."
                 )
             }
-            if (v != JSONObject.NULL) {
+            if (v != null) {
                 cleanInputs[k] = v.toString().trim()
             }
         }
@@ -112,6 +110,157 @@ object AiRouterClient {
             inputs = cleanInputs,
             previewResult = dryRun
         )
+    }
+
+    /** Parser JSON murni Kotlin agar unit test JVM bebas dari stub org.json Android. */
+    private fun extractJsonMap(raw: String): Map<String, Any?>? {
+        var s = raw.trim()
+        val fenceMatch = Regex("```(?:json)?\\s*([\\s\\S]*?)\\s*```", RegexOption.IGNORE_CASE).find(s)
+        if (fenceMatch != null) s = fenceMatch.groupValues[1].trim()
+        var pos = s.indexOf('{')
+        while (pos >= 0) {
+            val parsed = tryParseJsonObjectAt(s, pos)
+            if (parsed != null) return parsed
+            pos = s.indexOf('{', pos + 1)
+        }
+        return null
+    }
+
+    private fun tryParseJsonObjectAt(src: String, startIndex: Int): Map<String, Any?>? {
+        val p = JsonReader(src, startIndex)
+        return try {
+            p.readObject()
+        } catch (_: IllegalArgumentException) {
+            null
+        }
+    }
+
+    private class JsonReader(private val s: String, start: Int = 0) {
+        private var i = start
+
+        private fun skipWs() {
+            while (i < s.length && s[i].isWhitespace()) i++
+        }
+
+        private fun expect(ch: Char) {
+            skipWs()
+            if (i >= s.length || s[i] != ch) throw IllegalArgumentException("Expected $ch")
+            i++
+        }
+
+        private fun readValue(): Any? {
+            skipWs()
+            if (i >= s.length) throw IllegalArgumentException("Unexpected EOF")
+            return when (val ch = s[i]) {
+                '{' -> readObject()
+                '[' -> readArray()
+                '"' -> readString()
+                't' -> { expectLiteral("true"); true }
+                'f' -> { expectLiteral("false"); false }
+                'n' -> { expectLiteral("null"); null }
+                '-', in '0'..'9' -> readNumberLexeme()
+                else -> throw IllegalArgumentException("Unexpected char $ch")
+            }
+        }
+
+        private fun expectLiteral(lit: String) {
+            if (!s.startsWith(lit, i)) throw IllegalArgumentException("Expected $lit")
+            i += lit.length
+        }
+
+        fun readObject(): Map<String, Any?> {
+            expect('{')
+            val out = LinkedHashMap<String, Any?>()
+            skipWs()
+            if (i < s.length && s[i] == '}') { i++; return out }
+            while (true) {
+                skipWs()
+                if (i >= s.length || s[i] != '"') throw IllegalArgumentException("Expected key")
+                val key = readString()
+                expect(':')
+                out[key] = readValue()
+                skipWs()
+                if (i >= s.length) throw IllegalArgumentException("Unterminated object")
+                when (s[i++]) {
+                    ',' -> continue
+                    '}' -> return out
+                    else -> throw IllegalArgumentException("Bad object separator")
+                }
+            }
+        }
+
+        private fun readArray(): List<Any?> {
+            expect('[')
+            val out = ArrayList<Any?>()
+            skipWs()
+            if (i < s.length && s[i] == ']') { i++; return out }
+            while (true) {
+                out.add(readValue())
+                skipWs()
+                if (i >= s.length) throw IllegalArgumentException("Unterminated array")
+                when (s[i++]) {
+                    ',' -> continue
+                    ']' -> return out
+                    else -> throw IllegalArgumentException("Bad array separator")
+                }
+            }
+        }
+
+        private fun readString(): String {
+            expect('"')
+            val sb = StringBuilder()
+            while (i < s.length) {
+                val c = s[i++]
+                if (c == '"') return sb.toString()
+                if (c == '\\') {
+                    if (i >= s.length) throw IllegalArgumentException("Bad escape")
+                    when (val esc = s[i++]) {
+                        '"', '\\', '/' -> sb.append(esc)
+                        'b' -> sb.append('\b')
+                        'f' -> sb.append('\u000C')
+                        'n' -> sb.append('\n')
+                        'r' -> sb.append('\r')
+                        't' -> sb.append('\t')
+                        'u' -> {
+                            if (i + 4 > s.length) throw IllegalArgumentException("Bad unicode")
+                            val code = s.substring(i, i + 4).toIntOrNull(16)
+                                ?: throw IllegalArgumentException("Bad hex")
+                            sb.append(code.toChar())
+                            i += 4
+                        }
+                        else -> throw IllegalArgumentException("Bad escape $esc")
+                    }
+                } else if (c.code < 0x20) {
+                    throw IllegalArgumentException("Control char in string")
+                } else {
+                    sb.append(c)
+                }
+            }
+            throw IllegalArgumentException("Unterminated string")
+        }
+
+        private fun readNumberLexeme(): String {
+            val start = i
+            if (s[i] == '-') i++
+            if (i >= s.length || s[i] !in '0'..'9') throw IllegalArgumentException("Bad number")
+            if (s[i] == '0') {
+                i++
+            } else {
+                while (i < s.length && s[i] in '0'..'9') i++
+            }
+            if (i < s.length && s[i] == '.') {
+                i++
+                if (i >= s.length || s[i] !in '0'..'9') throw IllegalArgumentException("Bad fraction")
+                while (i < s.length && s[i] in '0'..'9') i++
+            }
+            if (i < s.length && (s[i] == 'e' || s[i] == 'E')) {
+                i++
+                if (i < s.length && (s[i] == '+' || s[i] == '-')) i++
+                if (i >= s.length || s[i] !in '0'..'9') throw IllegalArgumentException("Bad exponent")
+                while (i < s.length && s[i] in '0'..'9') i++
+            }
+            return s.substring(start, i)
+        }
     }
 
     /** Ekstrak objek JSON pertama dari teks (aman terhadap code fence ```json). */

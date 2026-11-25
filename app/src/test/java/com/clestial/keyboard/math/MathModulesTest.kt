@@ -258,7 +258,7 @@ class MathModulesTest {
         assertTrue(s1.answer.contains("Jangkauan = 6"))
         assertTrue(s1.answer.contains("Q₁ = 3"))
         assertTrue(s1.answer.contains("Q₃ = 6"))
-        assertTrue(s1.answer.contains("IQR = 3"))
+        assertTrue(s1.answer.contains("Jangkauan interkuartil = 3"))
 
         val sFreq = m.solve(mapOf("data" to "5:2, 7:3, 9:1"))
         assertTrue(sFreq.ok)

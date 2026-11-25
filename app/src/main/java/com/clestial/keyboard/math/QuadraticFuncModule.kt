@@ -84,7 +84,7 @@ class QuadraticFuncModule : MathModule {
         return SolveResult(
             ok = true,
             steps = steps,
-            answer = "Parabola $openDir; sumbu simetri x = ${xp.toFracString()}; puncak (${xp.toFracString()}, ${yp.toFracString()}); nilai $extLabel ${yp.toFracString()}; potong y (0, ${c.toFracString()}); potong x $xInterceptsText$extraAns",
+            answer = "Parabola $openDir; sumbu simetri x = ${xp.toFracString()}; puncak (${xp.toFracString()}, ${yp.toFracString()}); nilai $extLabel = ${yp.toFracString()}; potong y (0, ${c.toFracString()}); potong x $xInterceptsText$extraAns",
             check = "Substitusi xₚ = ${xp.toFracString()} ke fungsi: f(${xp.toFracString()}) = ${evalPeak.toFracString()} (sesuai yₚ = ${yp.toFracString()})."
         )
     }
