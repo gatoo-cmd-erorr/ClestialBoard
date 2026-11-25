@@ -1,0 +1,464 @@
+package com.clestial.keyboard
+
+import android.content.Context
+import android.content.SharedPreferences
+import androidx.appcompat.app.AppCompatDelegate
+import kotlin.math.abs
+
+/**
+ * Penyimpanan pengaturan terpusat (SharedPreferences).
+ *
+ * Semua nilai punya default, dicek rentangnya saat dibaca maupun ditulis, dan
+ * nilai rusak/tidak dikenal otomatis kembali ke default (tidak membuat crash).
+ * Rentang dan default dipakai bersama oleh halaman Preferences Typing dan
+ * keyboard, jadi tidak ada angka ganda di dua tempat.
+ */
+class Prefs(context: Context) {
+
+    private val sp = context.applicationContext
+        .getSharedPreferences(FILE_NAME, Context.MODE_PRIVATE)
+
+    init {
+        // Riwayat papan klip menyala sebagai bawaan. Sekali saja, nyalakan juga di perangkat yang
+        // sebelumnya tersimpan mati; sesudah itu pilihan pengguna dihormati seperti biasa.
+        val done = try {
+            sp.getBoolean(KEY_CLIP_HISTORY_MIGRATED, false)
+        } catch (e: ClassCastException) {
+            false
+        }
+        if (!done) {
+            sp.edit()
+                .putBoolean(KEY_CLIPBOARD, true)
+                .putBoolean(KEY_CLIP_HISTORY_MIGRATED, true)
+                .apply()
+        }
+    }
+
+    // ------------------------------------------------------------ Pembaca aman
+
+    private fun readBool(key: String, def: Boolean): Boolean =
+        try {
+            sp.getBoolean(key, def)
+        } catch (e: ClassCastException) {
+            def
+        }
+
+    private fun readInt(key: String, def: Int, min: Int, max: Int): Int {
+        val raw = try {
+            sp.getInt(key, def)
+        } catch (e: ClassCastException) {
+            def
+        }
+        return raw.coerceIn(min, max)
+    }
+
+    private fun readString(key: String, def: String): String =
+        try {
+            sp.getString(key, def) ?: def
+        } catch (e: ClassCastException) {
+            def
+        }
+
+    private fun writeBool(key: String, value: Boolean) {
+        sp.edit().putBoolean(key, value).apply()
+    }
+
+    private fun writeInt(key: String, value: Int, min: Int, max: Int) {
+        sp.edit().putInt(key, value.coerceIn(min, max)).apply()
+    }
+
+    // -------------------------------------------------------------------- Tema
+
+    var theme: String
+        get() {
+            val value = readString(KEY_THEME, THEME_DARK)
+            return if (value == THEME_DARK || value == THEME_LIGHT || value == THEME_SYSTEM) value else THEME_DARK
+        }
+        set(value) {
+            val safe = if (value == THEME_DARK || value == THEME_LIGHT) value else THEME_SYSTEM
+            sp.edit().putString(KEY_THEME, safe).apply()
+        }
+
+    /** Mode gelap/terang AndroidX sesuai pilihan tema. */
+    fun nightMode(): Int = when (theme) {
+        THEME_DARK -> AppCompatDelegate.MODE_NIGHT_YES
+        THEME_LIGHT -> AppCompatDelegate.MODE_NIGHT_NO
+        else -> AppCompatDelegate.MODE_NIGHT_FOLLOW_SYSTEM
+    }
+
+    // ------------------------------------------------------------ Tombol (Keypad)
+
+    /**
+     * Baris angka 1-0 di atas huruf (hanya di layar huruf).
+     * Saling meniadakan dengan [longPressNumbers]: menyalakan ini mematikan yang satunya.
+     */
+    var numberRow: Boolean
+        get() = readBool(KEY_NUMBER_ROW, true)
+        set(value) {
+            val editor = sp.edit().putBoolean(KEY_NUMBER_ROW, value)
+            if (value) editor.putBoolean(KEY_LP_NUMBERS, false)
+            editor.apply()
+        }
+
+    /** Tekan lama angka di baris angka memasukkan simbolnya (1 menjadi !). */
+    var numberRowSymbols: Boolean
+        get() = readBool(KEY_NUMBER_ROW_SYMBOLS, true)
+        set(value) = writeBool(KEY_NUMBER_ROW_SYMBOLS, value)
+
+    var commaKey: Boolean
+        get() = readBool(KEY_COMMA, true)
+        set(value) = writeBool(KEY_COMMA, value)
+
+    var periodKey: Boolean
+        get() = readBool(KEY_PERIOD, true)
+        set(value) = writeBool(KEY_PERIOD, value)
+
+    /**
+     * Tekan lama huruf Q sampai P memasukkan angka.
+     * Saling meniadakan dengan [numberRow]: keduanya boleh mati, tidak boleh menyala bersamaan.
+     * Bila data lama menyimpan keduanya menyala, baris angka yang menang.
+     */
+    var longPressNumbers: Boolean
+        get() = readBool(KEY_LP_NUMBERS, false) && !numberRow
+        set(value) {
+            val editor = sp.edit().putBoolean(KEY_LP_NUMBERS, value)
+            if (value) editor.putBoolean(KEY_NUMBER_ROW, false)
+            editor.apply()
+        }
+
+    // ----------------------------------------------------------------- Tampilan
+
+    var fontPercent: Int
+        get() = readInt(KEY_FONT, FONT_DEFAULT, FONT_MIN, FONT_MAX)
+        set(value) = writeInt(KEY_FONT, value, FONT_MIN, FONT_MAX)
+
+    var heightPercent: Int
+        get() = readInt(KEY_HEIGHT, HEIGHT_DEFAULT, HEIGHT_MIN, HEIGHT_MAX)
+        set(value) = writeInt(KEY_HEIGHT, value, HEIGHT_MIN, HEIGHT_MAX)
+
+    /**
+     * Belajar dari ketikan: kata yang sering diketik naik urutannya di saran kata.
+     * Datanya hanya di perangkat. Mati: tidak mencatat dan tidak memakai data yang sudah ada.
+     */
+    var learnTyping: Boolean
+        get() = readBool(KEY_LEARN_TYPING, true)
+        set(value) = writeBool(KEY_LEARN_TYPING, value)
+
+    /** Hapus otomatis isi papan klip (teks dan screenshot) yang tidak disematkan setelah [clipExpireDays]. */
+    var clipExpire: Boolean
+        get() = readBool(KEY_CLIP_EXPIRE, true)
+        set(value) = writeBool(KEY_CLIP_EXPIRE, value)
+
+    /** Lama bertahan di papan klip, dalam hari: salah satu dari [CLIP_DAYS]. */
+    var clipExpireDays: Int
+        get() {
+            val v = readInt(KEY_CLIP_DAYS, CLIP_DAYS_DEFAULT, CLIP_DAYS.first(), CLIP_DAYS.last())
+            return CLIP_DAYS.minByOrNull { abs(it - v) } ?: CLIP_DAYS_DEFAULT
+        }
+        set(value) = writeInt(KEY_CLIP_DAYS, value, CLIP_DAYS.first(), CLIP_DAYS.last())
+
+    /** Batas umur isi papan klip dalam milidetik; 0 berarti tidak dihapus otomatis. */
+    fun clipMaxAgeMs(): Long = if (clipExpire) clipExpireDays * 86_400_000L else 0L
+
+    /**
+     * Tampilkan screenshot terbaru di papan klip (butuh izin akses foto). Saat dinyalakan, waktunya
+     * dicatat: hanya screenshot yang diambil sesudahnya yang ikut tampil, bukan yang lama.
+     */
+    var clipScreenshots: Boolean
+        get() = readBool(KEY_CLIP_SHOTS, false)
+        set(value) {
+            val was = readBool(KEY_CLIP_SHOTS, false)
+            val editor = sp.edit().putBoolean(KEY_CLIP_SHOTS, value)
+            if (value && !was) editor.putLong(KEY_SHOT_SINCE, System.currentTimeMillis())
+            editor.apply()
+        }
+
+    /** Waktu (ms) fitur screenshot terakhir dinyalakan. */
+    val screenshotSinceMs: Long
+        get() = try {
+            sp.getLong(KEY_SHOT_SINCE, 0L)
+        } catch (e: ClassCastException) {
+            0L
+        }
+
+    /** Bahasa asal terjemahan (kode ML Kit, misalnya "id"). */
+    var translateFrom: String
+        get() = readString(KEY_TR_FROM, "id")
+        set(value) {
+            sp.edit().putString(KEY_TR_FROM, value).apply()
+        }
+
+    /** Bahasa tujuan terjemahan (kode ML Kit, misalnya "en"). */
+    var translateTo: String
+        get() = readString(KEY_TR_TO, "en")
+        set(value) {
+            sp.edit().putString(KEY_TR_TO, value).apply()
+        }
+
+    /** Unduh data bahasa hanya lewat Wi-Fi. */
+    var translateWifiOnly: Boolean
+        get() = readBool(KEY_TR_WIFI, true)
+        set(value) = writeBool(KEY_TR_WIFI, value)
+
+    /** URL server proxy tipis 9router (tanpa menyimpan API key di perangkat). */
+    var aiProxyUrl: String
+        get() = readString(KEY_AI_PROXY_URL, DEFAULT_AI_PROXY_URL)
+        set(value) {
+            sp.edit().putString(KEY_AI_PROXY_URL, value.trim().ifEmpty { DEFAULT_AI_PROXY_URL }).apply()
+        }
+
+    /** Tombol kontrol kursor di bilah Tools (panah, pilih, salin, tempel, potong). */
+    var cursorTool: Boolean
+        get() = readBool(KEY_CURSOR_TOOL, true)
+        set(value) = writeBool(KEY_CURSOR_TOOL, value)
+
+    /** Jeda antar langkah saat panah kontrol kursor ditahan, dalam milidetik. Makin kecil makin cepat. */
+    var cursorRepeatMs: Int
+        get() = readInt(KEY_CURSOR_REPEAT, CURSOR_REPEAT_DEFAULT, CURSOR_REPEAT_MIN, CURSOR_REPEAT_MAX)
+        set(value) = writeInt(KEY_CURSOR_REPEAT, value, CURSOR_REPEAT_MIN, CURSOR_REPEAT_MAX)
+
+    /** Simpan riwayat papan klip (teks yang disalin) di perangkat untuk ditempel lagi. */
+    var clipboardHistory: Boolean
+        get() = readBool(KEY_CLIPBOARD, true)
+        set(value) = writeBool(KEY_CLIPBOARD, value)
+
+    /** Emoji: tekan lama tombol koma membuka panel emoji. */
+    var emoji: Boolean
+        get() = readBool(KEY_EMOJI, true)
+        set(value) = writeBool(KEY_EMOJI, value)
+
+    /** Emoji yang terakhir dipakai, dipisah spasi, yang terbaru di depan. */
+    var emojiRecents: String
+        get() = readString(KEY_EMOJI_RECENTS, "")
+        set(value) {
+            sp.edit().putString(KEY_EMOJI_RECENTS, value).apply()
+        }
+
+    /** Seberapa tinggi keyboard dinaikkan dari tepi bawah layar, dalam dp (0 sampai [KB_OFFSET_MAX_DP]). */
+    var keyboardOffsetDp: Int
+        get() = readInt(KEY_KB_OFFSET, 0, 0, KB_OFFSET_MAX_DP)
+        set(value) = writeInt(KEY_KB_OFFSET, value, 0, KB_OFFSET_MAX_DP)
+
+    /** Bilah Tools keyboard di atas tombol (isinya menyusul). Menambah tinggi keyboard. */
+    var toolsBar: Boolean
+        get() = readBool(KEY_TOOLS_BAR, true)
+        set(value) = writeBool(KEY_TOOLS_BAR, value)
+
+    /**
+     * Kolom saran kata di atas tombol (isinya menyusul). Menambah tinggi keyboard.
+     * Bila menyala bersama [toolsBar], keduanya bergantian di bilah yang sama.
+     */
+    var suggestionBar: Boolean
+        get() = readBool(KEY_SUGGESTION_BAR, true)
+        set(value) = writeBool(KEY_SUGGESTION_BAR, value)
+
+    var widthPercent: Int
+        get() = readInt(KEY_WIDTH, WIDTH_DEFAULT, WIDTH_MIN, WIDTH_MAX)
+        set(value) = writeInt(KEY_WIDTH, value, WIDTH_MIN, WIDTH_MAX)
+
+    /** Mode satu tangan: [ONE_HAND_OFF], [ONE_HAND_LEFT], atau [ONE_HAND_RIGHT]. */
+    var oneHandMode: String
+        get() {
+            val value = readString(KEY_ONE_HAND, ONE_HAND_OFF)
+            return if (value == ONE_HAND_LEFT || value == ONE_HAND_RIGHT) value else ONE_HAND_OFF
+        }
+        set(value) {
+            val safe = if (value == ONE_HAND_LEFT || value == ONE_HAND_RIGHT) value else ONE_HAND_OFF
+            sp.edit().putString(KEY_ONE_HAND, safe).apply()
+        }
+
+    // ------------------------------------------------------------------ Pintasan
+
+    /** Huruf besar otomatis sesuai permintaan kolom teks (awal kalimat, dan seterusnya). */
+    var autoCap: Boolean
+        get() = readBool(KEY_AUTO_CAP, true)
+        set(value) = writeBool(KEY_AUTO_CAP, value)
+
+    /** Huruf besar setelah akhir kalimat, juga di kolom yang tidak memintanya. Butuh [autoCap]. */
+    var sentenceCap: Boolean
+        get() = readBool(KEY_SENTENCE_CAP, false)
+        set(value) = writeBool(KEY_SENTENCE_CAP, value)
+
+    var doubleSpacePeriod: Boolean
+        get() = readBool(KEY_DOUBLE_SPACE, false)
+        set(value) = writeBool(KEY_DOUBLE_SPACE, value)
+
+    var autoSpacePunct: Boolean
+        get() = readBool(KEY_AUTO_SPACE, false)
+        set(value) = writeBool(KEY_AUTO_SPACE, value)
+
+    /** Gestur geser di tombol spasi untuk memindah kursor. */
+    var gestureSpace: Boolean
+        get() = readBool(KEY_GESTURE_SPACE, true)
+        set(value) = writeBool(KEY_GESTURE_SPACE, value)
+
+    /** Gestur Shift + hapus untuk memblok lalu menghapus teks. */
+    var gestureSelect: Boolean
+        get() = readBool(KEY_GESTURE_SELECT, true)
+        set(value) = writeBool(KEY_GESTURE_SELECT, value)
+
+    // ---------------------------------------------------------- Pengetuk tombol
+
+    var charPreview: Boolean
+        get() = readBool(KEY_CHAR_PREVIEW, true)
+        set(value) = writeBool(KEY_CHAR_PREVIEW, value)
+
+    var keyPopup: Boolean
+        get() = readBool(KEY_KEY_POPUP, true)
+        set(value) = writeBool(KEY_KEY_POPUP, value)
+
+    var vibrate: Boolean
+        get() = readBool(KEY_VIBRATE, true)
+        set(value) = writeBool(KEY_VIBRATE, value)
+
+    /** Lama getar tiap ketukan, dalam milidetik (5 sampai 100). */
+    var vibrateStrength: Int
+        get() = readInt(KEY_VIBRATE_STRENGTH, STRENGTH_DEFAULT, STRENGTH_MIN, STRENGTH_MAX)
+        set(value) = writeInt(KEY_VIBRATE_STRENGTH, value, STRENGTH_MIN, STRENGTH_MAX)
+
+    var sound: Boolean
+        get() = readBool(KEY_SOUND, false)
+        set(value) = writeBool(KEY_SOUND, value)
+
+    /** Volume suara tiap ketukan, dalam persen (5 sampai 100). */
+    var soundVolume: Int
+        get() = readInt(KEY_SOUND_VOLUME, VOLUME_DEFAULT, VOLUME_MIN, VOLUME_MAX)
+        set(value) = writeInt(KEY_SOUND_VOLUME, value, VOLUME_MIN, VOLUME_MAX)
+
+    /** Durasi tekan lama (ms): tekan lama huruf dan awal hapus berulang. */
+    var longPressDelay: Int
+        get() = readInt(KEY_LP_DELAY, LP_DELAY_DEFAULT, LP_DELAY_MIN, LP_DELAY_MAX)
+        set(value) = writeInt(KEY_LP_DELAY, value, LP_DELAY_MIN, LP_DELAY_MAX)
+
+    // --------------------------------------------------------- Pulihkan / pantau
+
+    /** Kembalikan semua pengaturan mengetik ke default. Tema tidak ikut diubah. */
+    fun restoreTypingDefaults() {
+        val editor = sp.edit()
+        for (key in TYPING_KEYS) editor.remove(key)
+        editor.apply()
+    }
+
+    fun registerListener(listener: SharedPreferences.OnSharedPreferenceChangeListener) {
+        sp.registerOnSharedPreferenceChangeListener(listener)
+    }
+
+    fun unregisterListener(listener: SharedPreferences.OnSharedPreferenceChangeListener) {
+        sp.unregisterOnSharedPreferenceChangeListener(listener)
+    }
+
+    companion object {
+        const val THEME_DARK = "dark"
+        const val THEME_LIGHT = "light"
+        const val THEME_SYSTEM = "system"
+
+        const val ONE_HAND_OFF = "off"
+        const val ONE_HAND_LEFT = "left"
+        const val ONE_HAND_RIGHT = "right"
+
+        // Rentang slider (persen kecuali disebut lain). Nilai harus kelipatan langkahnya.
+        const val FONT_MIN = 80
+        const val FONT_MAX = 130
+        const val FONT_DEFAULT = 100
+        const val FONT_STEP = 5
+
+        const val HEIGHT_MIN = 70
+        const val HEIGHT_MAX = 140
+        const val HEIGHT_DEFAULT = 100
+
+        // Batas menaikkan keyboard dari tepi bawah (dp), dipakai mode Ubah ukuran.
+        const val KB_OFFSET_MAX_DP = 120
+        const val HEIGHT_STEP = 5
+
+        const val WIDTH_MIN = 70
+        const val WIDTH_MAX = 100
+        const val WIDTH_DEFAULT = 100
+        const val WIDTH_STEP = 5
+
+        // Jeda ulang panah kontrol kursor (ms).
+        const val CURSOR_REPEAT_MIN = 30
+        const val CURSOR_REPEAT_MAX = 150
+        const val CURSOR_REPEAT_DEFAULT = 60
+        const val CURSOR_REPEAT_STEP = 10
+
+        // Pilihan lama isi papan klip bertahan, dalam hari.
+        val CLIP_DAYS = intArrayOf(1, 5, 7, 14, 30)
+        const val CLIP_DAYS_DEFAULT = 7
+
+        // Durasi getar dalam milidetik (ms).
+        const val STRENGTH_MIN = 5
+        const val STRENGTH_MAX = 100
+        const val STRENGTH_DEFAULT = 20
+        const val STRENGTH_STEP = 5
+
+        // Volume suara tombol dalam persen.
+        const val VOLUME_MIN = 5
+        const val VOLUME_MAX = 100
+        const val VOLUME_DEFAULT = 100
+        const val VOLUME_STEP = 5
+
+        const val LP_DELAY_MIN = 100
+        const val LP_DELAY_MAX = 1000
+        const val LP_DELAY_DEFAULT = 350
+        const val LP_DELAY_STEP = 50
+
+        private const val FILE_NAME = "clestial_prefs"
+        private const val KEY_THEME = "theme"
+
+        // Kunci lama dipertahankan supaya pengaturan pengguna tidak hilang saat pembaruan.
+        private const val KEY_VIBRATE = "vibrate"
+        private const val KEY_SOUND = "sound"
+        private const val KEY_HEIGHT = "height_percent"
+        private const val KEY_KB_OFFSET = "kb_offset_dp"
+        private const val KEY_GESTURE_SPACE = "gesture_space"
+        private const val KEY_GESTURE_SELECT = "gesture_select"
+
+        private const val KEY_NUMBER_ROW = "number_row"
+        private const val KEY_NUMBER_ROW_SYMBOLS = "number_row_symbols"
+        private const val KEY_COMMA = "comma_key"
+        private const val KEY_PERIOD = "period_key"
+        private const val KEY_LP_NUMBERS = "long_press_numbers"
+        private const val KEY_FONT = "font_percent"
+        private const val KEY_WIDTH = "width_percent"
+        /** Publik: halaman Preferences Typing memantau kunci ini (tombol satu tangan di keyboard). */
+        const val KEY_ONE_HAND = "one_hand_mode"
+        private const val KEY_AUTO_CAP = "auto_cap"
+        private const val KEY_SENTENCE_CAP = "sentence_cap"
+        private const val KEY_DOUBLE_SPACE = "double_space_period"
+        private const val KEY_AUTO_SPACE = "auto_space_punct"
+        private const val KEY_CHAR_PREVIEW = "char_preview"
+        private const val KEY_KEY_POPUP = "key_popup"
+        private const val KEY_VIBRATE_STRENGTH = "vibrate_strength"
+        private const val KEY_SOUND_VOLUME = "sound_volume"
+        private const val KEY_LP_DELAY = "long_press_delay"
+        private const val KEY_TOOLS_BAR = "tools_bar"
+        private const val KEY_LEARN_TYPING = "learn_typing"
+        private const val KEY_EMOJI = "emoji_enabled"
+        private const val KEY_CLIPBOARD = "clipboard_history"
+        private const val KEY_CLIP_HISTORY_MIGRATED = "clip_history_default_on"
+        private const val KEY_CURSOR_TOOL = "cursor_tool"
+        private const val KEY_TR_FROM = "translate_from"
+        private const val KEY_TR_TO = "translate_to"
+        private const val KEY_TR_WIFI = "translate_wifi_only"
+        private const val KEY_CURSOR_REPEAT = "cursor_repeat_ms"
+        private const val KEY_CLIP_EXPIRE = "clip_expire"
+        private const val KEY_CLIP_DAYS = "clip_expire_days"
+        private const val KEY_CLIP_SHOTS = "clip_screenshots"
+        private const val KEY_SHOT_SINCE = "clip_shot_since"
+        private const val KEY_EMOJI_RECENTS = "emoji_recents"
+        private const val KEY_SUGGESTION_BAR = "suggestion_bar"
+        private const val KEY_AI_PROXY_URL = "ai_proxy_url"
+        const val DEFAULT_AI_PROXY_URL = "http://10.0.2.2:8787"
+
+        /** Semua kunci pengaturan mengetik (semua kecuali tema). */
+        private val TYPING_KEYS = listOf(
+            KEY_VIBRATE, KEY_SOUND, KEY_HEIGHT, KEY_KB_OFFSET, KEY_GESTURE_SPACE, KEY_GESTURE_SELECT,
+            KEY_NUMBER_ROW, KEY_NUMBER_ROW_SYMBOLS, KEY_COMMA, KEY_PERIOD,
+            KEY_LP_NUMBERS, KEY_FONT, KEY_WIDTH, KEY_ONE_HAND,
+            KEY_AUTO_CAP, KEY_SENTENCE_CAP, KEY_DOUBLE_SPACE, KEY_AUTO_SPACE,
+            KEY_CHAR_PREVIEW, KEY_KEY_POPUP, KEY_VIBRATE_STRENGTH, KEY_SOUND_VOLUME,
+            KEY_LP_DELAY, KEY_TOOLS_BAR, KEY_SUGGESTION_BAR, KEY_LEARN_TYPING, KEY_EMOJI, KEY_CLIPBOARD,
+            KEY_CLIP_EXPIRE, KEY_CLIP_DAYS, KEY_CURSOR_TOOL, KEY_CURSOR_REPEAT
+        )
+    }
+}

@@ -1,0 +1,5 @@
+<?xml version="1.0" encoding="utf-8"?>
+<network-security-config>
+    <!-- Izinkan koneksi HTTP ke proxy lokal / LAN 9router, tetap utamakan HTTPS di domain publik -->
+    <base-config cleartextTrafficPermitted="true" />
+</network-security-config>

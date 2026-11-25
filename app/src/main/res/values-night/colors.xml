@@ -1,0 +1,26 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <!-- Tema Gelap (seperti foto): Obsidian hitam pekat & aksen chrome putih-perak berkilau -->
+    <color name="bg">#000000</color>
+    <color name="fg">#FFFFFF</color>
+    <color name="muted">#9EA6B3</color>
+    <color name="card">#111317</color>
+    <color name="card_top">#272B33</color>
+    <color name="card_bottom">#090A0D</color>
+    <color name="bevel_dark">#040507</color>
+    <color name="bevel_light">#99FFFFFF</color>
+    <color name="line">#383E49</color>
+    <color name="nav_active">#FFFFFF</color>
+    <color name="inv">#F5F7FA</color>
+    <color name="on_inv">#050608</color>
+    <color name="btn_top">#FFFFFF</color>
+    <color name="btn_mid">#DDE2EB</color>
+    <color name="btn_bot">#9AA3B0</color>
+    <color name="btn_lip">#525965</color>
+    <color name="btn_stroke">#FFFFFF</color>
+    <color name="chrome_bright">#FFFFFF</color>
+    <color name="chrome_mid">#C5CCD6</color>
+    <color name="chrome_dark">#5E6572</color>
+    <color name="hero_bg">#000000</color>
+    <color name="hero_stroke">#78FFFFFF</color>
+</resources>
