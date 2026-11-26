@@ -48,7 +48,6 @@ class MainActivity : AppCompatActivity() {
     private lateinit var cardMath: View
     private lateinit var cardFloating: View
     private lateinit var switchFloating: SwitchCompat
-    private lateinit var cardQuiz: View
 
     private lateinit var optDark: View
     private lateinit var optLight: View
@@ -108,7 +107,6 @@ class MainActivity : AppCompatActivity() {
         cardMath = findViewById(R.id.cardMath)
         cardFloating = findViewById(R.id.cardFloating)
         switchFloating = findViewById(R.id.switchFloating)
-        cardQuiz = findViewById(R.id.cardQuiz)
 
         optDark = findViewById(R.id.optDark)
         optLight = findViewById(R.id.optLight)
@@ -167,10 +165,6 @@ class MainActivity : AppCompatActivity() {
                 Toast.makeText(this, "Menu Melayang dinonaktifkan.", Toast.LENGTH_SHORT).show()
             }
             refreshFloatingCard()
-        }
-
-        cardQuiz.setOnClickListener {
-            startActivity(Intent(this, com.clestial.keyboard.quiz.QuizPracticeActivity::class.java))
         }
 
         optDark.setOnClickListener { chooseTheme(Prefs.THEME_DARK) }

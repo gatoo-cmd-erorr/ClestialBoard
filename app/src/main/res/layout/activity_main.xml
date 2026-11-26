@@ -465,47 +465,6 @@
                         android:focusable="false" />
                 </LinearLayout>
 
-                <!-- B6. Aplikasi Kuis ABCD (Simulasi Ujian Mahasiswa) -->
-                <LinearLayout
-                    android:id="@+id/cardQuiz"
-                    style="@style/ClestialCard"
-                    android:layout_width="match_parent"
-                    android:layout_height="wrap_content"
-                    android:layout_marginTop="10dp"
-                    android:clickable="true"
-                    android:focusable="true"
-                    android:gravity="center_vertical"
-                    android:orientation="horizontal">
-
-                    <LinearLayout
-                        android:layout_width="0dp"
-                        android:layout_height="wrap_content"
-                        android:layout_weight="1"
-                        android:orientation="vertical">
-
-                        <TextView
-                            style="@style/ClestialTitle"
-                            android:layout_width="wrap_content"
-                            android:layout_height="wrap_content"
-                            android:text="Aplikasi Kuis ABCD Mahasiswa" />
-
-                        <TextView
-                            style="@style/ClestialDesc"
-                            android:layout_width="wrap_content"
-                            android:layout_height="wrap_content"
-                            android:layout_marginTop="2dp"
-                            android:text="Uji coba auto-jawab pilihan ganda langsung di simulasi ujian (bukan mock)" />
-                    </LinearLayout>
-
-                    <ImageView
-                        android:layout_width="24dp"
-                        android:layout_height="24dp"
-                        android:layout_marginStart="12dp"
-                        android:importantForAccessibility="no"
-                        android:src="@drawable/ic_chevron_right"
-                        android:tint="@color/muted" />
-                </LinearLayout>
-
                 <!-- Pembatas Stud LEGO B3 | C -->
                 <com.clestial.keyboard.LegoStudStripView
                     android:layout_width="match_parent"

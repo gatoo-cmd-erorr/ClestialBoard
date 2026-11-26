@@ -24,7 +24,6 @@ Dilengkapi **Kalkulator Umum & Ilmiah**, **11 Modul Matematika SMP Kelas 9 Eksak
    - **Engine Pemecah Cerdas (`AbcdSolver`):** Memanfaatkan AI (ChatGPT API sk-... / Proxy 9router) serta dilengkapi Solver Heuristik & Matematika Eksak lokal mandiri (offline).
    - **Menu Pop-up Hide Anti-Detek:** Pengaturan lengkap di pop-up mengambang tersamar (Tab 🎯 Auto ABCD) meliputi switch aktif, mode Auto-Klik vs Kunci Saja, jeda waktu (0s, 1.5s, 2s, 3s anti-detek), status izin, dan tombol pemicu pemindaian langsung.
    - **Selection Box / OCR Crop:** Mengarahkan kotak seleksi neon biru ke soal di aplikasi apa pun, langsung mendeteksi ABCD, mengekstrak kunci, dan auto-click.
-   - **Aplikasi Kuis Mahasiswa Bawaan (`QuizPracticeActivity`):** Modul simulasi kuis interaktif 10 soal nyata (Struktur Data, Aljabar, Basis Data, Jaringan, Statistika) untuk pembuktian dan pengujian langsung.
 
 ## Mengambil APK dari GitHub Actions
 

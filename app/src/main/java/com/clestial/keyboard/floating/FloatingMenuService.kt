@@ -39,7 +39,6 @@ import com.clestial.keyboard.R
 import com.clestial.keyboard.autoanswer.AbcdSolutionResult
 import com.clestial.keyboard.autoanswer.AbcdSolver
 import com.clestial.keyboard.autoanswer.AutoAnswerAccessibilityService
-import com.clestial.keyboard.quiz.QuizPracticeActivity
 import com.clestial.keyboard.math.AiRouterClient
 import com.clestial.keyboard.math.FieldType
 import com.clestial.keyboard.math.MathModule
@@ -849,7 +848,6 @@ class FloatingMenuService : Service() {
         val btnD2 = popup.findViewById<Button>(R.id.btnDelay2)
         val btnD3 = popup.findViewById<Button>(R.id.btnDelay3)
         val btnTriggerScreenAnswer = popup.findViewById<Button>(R.id.btnTriggerScreenAnswer)
-        val btnOpenQuizApp = popup.findViewById<Button>(R.id.btnOpenQuizApp)
         val tvAutoStatus = popup.findViewById<TextView>(R.id.tvAutoAnswerStatus)
         val btnCopyAutoAnswer = popup.findViewById<Button>(R.id.btnCopyAutoAnswer)
 
@@ -955,14 +953,6 @@ class FloatingMenuService : Service() {
                 tvAutoStatus.text = "Layanan Aksesibilitas belum aktif. Aktifkan izin untuk auto-klik langsung di layar."
                 Toast.makeText(this, "Izin Aksesibilitas belum aktif", Toast.LENGTH_SHORT).show()
             }
-        }
-
-        btnOpenQuizApp.setOnClickListener {
-            hidePopup()
-            val intent = Intent(this, QuizPracticeActivity::class.java).apply {
-                flags = Intent.FLAG_ACTIVITY_NEW_TASK
-            }
-            startActivity(intent)
         }
 
         btnCopyAutoAnswer.setOnClickListener {
