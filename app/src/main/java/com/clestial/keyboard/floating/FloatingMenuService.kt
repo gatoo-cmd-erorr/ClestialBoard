@@ -848,10 +848,10 @@ class FloatingMenuService : Service() {
         val btnD1 = popup.findViewById<Button>(R.id.btnDelay1)
         val btnD2 = popup.findViewById<Button>(R.id.btnDelay2)
         val btnD3 = popup.findViewById<Button>(R.id.btnDelay3)
-        val btnTriggerScreen = popup.findViewById<Button>(R.id.btnTriggerScreenAnswer)
-        val btnOpenQuiz = popup.findViewById<Button>(R.id.btnOpenQuizApp)
+        val btnTriggerScreenAnswer = popup.findViewById<Button>(R.id.btnTriggerScreenAnswer)
+        val btnOpenQuizApp = popup.findViewById<Button>(R.id.btnOpenQuizApp)
         val tvAutoStatus = popup.findViewById<TextView>(R.id.tvAutoAnswerStatus)
-        val btnCopyAuto = popup.findViewById<Button>(R.id.btnCopyAutoAnswer)
+        val btnCopyAutoAnswer = popup.findViewById<Button>(R.id.btnCopyAutoAnswer)
 
         fun updateAccStatus() {
             val running = AutoAnswerAccessibilityService.isRunning
