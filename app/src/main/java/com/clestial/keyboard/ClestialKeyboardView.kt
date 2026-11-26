@@ -1,6 +1,8 @@
 package com.clestial.keyboard
 
 import android.content.Context
+import android.content.ClipboardManager
+import android.content.ClipData
 import android.content.res.Configuration
 import android.graphics.Bitmap
 import android.graphics.Canvas
