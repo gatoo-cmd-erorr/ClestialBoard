@@ -13,6 +13,7 @@ import android.os.Build
 import android.os.Handler
 import android.os.IBinder
 import android.os.Looper
+import android.view.ContextThemeWrapper
 import android.view.Gravity
 import android.view.LayoutInflater
 import android.view.MotionEvent
@@ -226,7 +227,8 @@ class FloatingMenuService : Service() {
     private fun createDockView() {
         if (!FloatingMenuManager.canDrawOverlays(this)) return
 
-        val inflater = LayoutInflater.from(this)
+        val themedContext = ContextThemeWrapper(this, R.style.Theme_ClestialKeyboard)
+        val inflater = LayoutInflater.from(themedContext)
         val dockRoot = inflater.inflate(R.layout.layout_floating_dock, null)
 
         val overlayType = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
@@ -337,7 +339,8 @@ class FloatingMenuService : Service() {
     private fun createSelectionBoxView() {
         if (!FloatingMenuManager.canDrawOverlays(this)) return
 
-        val inflater = LayoutInflater.from(this)
+        val themedContext = ContextThemeWrapper(this, R.style.Theme_ClestialKeyboard)
+        val inflater = LayoutInflater.from(themedContext)
         val boxRoot = inflater.inflate(R.layout.layout_selection_box, null)
 
         val overlayType = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
@@ -489,7 +492,8 @@ class FloatingMenuService : Service() {
     private fun createPopupView() {
         if (!FloatingMenuManager.canDrawOverlays(this)) return
 
-        val inflater = LayoutInflater.from(this)
+        val themedContext = ContextThemeWrapper(this, R.style.Theme_ClestialKeyboard)
+        val inflater = LayoutInflater.from(themedContext)
         val popup = inflater.inflate(R.layout.layout_floating_popup, null)
 
         val overlayType = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
