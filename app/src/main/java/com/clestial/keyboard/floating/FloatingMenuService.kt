@@ -620,7 +620,7 @@ class FloatingMenuService : Service() {
             tvAiResponse.text = "Sedang memproses dengan AI..."
             btnAiSubmit.isEnabled = false
 
-            AiRouterClient.askQuestion(this, q) { res ->
+            AiRouterClient.askQuestion(prefs, q) { res ->
                 mainHandler.post {
                     btnAiSubmit.isEnabled = true
                     if (res.ok) {
@@ -643,12 +643,12 @@ class FloatingMenuService : Service() {
         }
 
         // --- Tab 2: Google Web Search
-        val etGoogleSearch = popup.findViewById<EditText>(R.id.etGoogleSearch)
-        val btnGoogleSubmit = popup.findViewById<Button>(R.id.btnGoogleSubmit)
-        val btnGoogleBack = popup.findViewById<ImageButton>(R.id.btnGoogleBack)
-        val btnGoogleReload = popup.findViewById<ImageButton>(R.id.btnGoogleReload)
-        val tvGoogleUrl = popup.findViewById<TextView>(R.id.tvGoogleUrl)
-        val webView = popup.findViewById<WebView>(R.id.webViewGoogle)
+        val etGoogleSearch = popup.findViewById<EditText>(R.id.etGoogleQuery)
+        val btnGoogleSubmit = popup.findViewById<Button>(R.id.btnGoogleSearch)
+        val btnGoogleBack = popup.findViewById<ImageButton>(R.id.btnWebBack)
+        val btnGoogleReload = popup.findViewById<ImageButton>(R.id.btnWebReload)
+        val tvGoogleUrl = popup.findViewById<TextView>(R.id.tvWebUrl)
+        val webView = popup.findViewById<WebView>(R.id.wvGoogle)
         etGoogleSearchRef = etGoogleSearch
         webViewRef = webView
 
@@ -682,12 +682,12 @@ class FloatingMenuService : Service() {
         webView.loadUrl("https://www.google.com")
 
         // --- Tab 3: SMP 9 Math Modules
-        val mathChipContainer = popup.findViewById<LinearLayout>(R.id.mathChipContainer)
-        val tvMathDesc = popup.findViewById<TextView>(R.id.tvMathModuleDesc)
-        val containerMathInputs = popup.findViewById<LinearLayout>(R.id.containerMathInputs)
-        val tvMathResult = popup.findViewById<TextView>(R.id.tvMathResult)
-        val btnMathSolve = popup.findViewById<Button>(R.id.btnMathSolve)
-        val btnMathCopy = popup.findViewById<Button>(R.id.btnMathCopy)
+        val mathChipContainer = popup.findViewById<LinearLayout>(R.id.mathChipsRow)
+        val tvMathDesc = popup.findViewById<TextView>(R.id.tvFloatingMathDesc)
+        val containerMathInputs = popup.findViewById<LinearLayout>(R.id.mathFieldsContainer)
+        val tvMathResult = popup.findViewById<TextView>(R.id.tvFloatingMathResult)
+        val btnMathSolve = popup.findViewById<Button>(R.id.btnFloatingMathSolve)
+        val btnMathCopy = popup.findViewById<Button>(R.id.btnFloatingMathCopy)
 
         fun buildMathModuleUI(mod: MathModule) {
             activeMathModule = mod
@@ -722,9 +722,9 @@ class FloatingMenuService : Service() {
 
                     inputType = when (field.type) {
                         FieldType.INTEGER -> android.text.InputType.TYPE_CLASS_NUMBER or android.text.InputType.TYPE_NUMBER_FLAG_SIGNED
-                        FieldType.DECIMAL -> android.text.InputType.TYPE_CLASS_NUMBER or android.text.InputType.TYPE_NUMBER_FLAG_DECIMAL or android.text.InputType.TYPE_NUMBER_FLAG_SIGNED
+                        FieldType.NUMBER -> android.text.InputType.TYPE_CLASS_NUMBER or android.text.InputType.TYPE_NUMBER_FLAG_DECIMAL or android.text.InputType.TYPE_NUMBER_FLAG_SIGNED
+                        FieldType.CHOICE -> android.text.InputType.TYPE_CLASS_TEXT
                         FieldType.TEXT -> android.text.InputType.TYPE_CLASS_TEXT
-                        FieldType.SELECT -> android.text.InputType.TYPE_CLASS_TEXT
                     }
                 }
 
@@ -738,7 +738,7 @@ class FloatingMenuService : Service() {
         // Buat chip untuk ke-11 modul
         MathRegistry.modules.forEachIndexed { index, mod ->
             val chip = Button(this).apply {
-                text = "${index + 1}. ${mod.shortName.uppercase()}"
+                text = "${index + 1}. ${mod.name.take(16).uppercase()}"
                 textSize = 11f
                 setTextColor(if (index == 0) Color.WHITE else Color.parseColor("#8E92A0"))
                 setBackgroundResource(if (index == 0) R.drawable.bg_pill_on else R.drawable.bg_pill)
@@ -767,15 +767,19 @@ class FloatingMenuService : Service() {
             for ((k, et) in mathInputFields) {
                 map[k] = et.text.toString().trim()
             }
-            val res = activeMathModule.solver(map)
+            val res = activeMathModule.solve(map)
             val fullText = buildString {
-                append("Hasil: ").append(res.summary).append("\n\n")
-                if (res.steps.isNotEmpty()) {
-                    append("Langkah-langkah:\n")
-                    res.steps.forEachIndexed { i, s -> append("${i + 1}. $s\n") }
-                }
-                if (res.notes.isNotEmpty()) {
-                    append("\nCatatan: ").append(res.notes)
+                if (res.ok) {
+                    append("Hasil: ").append(res.answer).append("\n\n")
+                    if (res.steps.isNotEmpty()) {
+                        append("Langkah-langkah:\n")
+                        res.steps.forEachIndexed { i: Int, s: String -> append("${i + 1}. $s\n") }
+                    }
+                    if (res.check.isNotEmpty()) {
+                        append("\nCek: ").append(res.check)
+                    }
+                } else {
+                    append("Error: ").append(res.error)
                 }
             }
             tvMathResult.text = fullText
