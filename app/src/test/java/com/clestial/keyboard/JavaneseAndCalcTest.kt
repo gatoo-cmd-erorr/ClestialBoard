@@ -40,6 +40,22 @@ class JavaneseAndCalcTest {
 
         // Javanese digits
         assertEquals("2026", JavaneseScript.toLatin("꧒꧐꧒꧖"))
+
+        // Pasangan and wyanjana cluster tests
+        val kna = "ꦏ${JavaneseScript.CH_PANGKON}ꦤ" // ka + pangkon + na -> kna
+        assertEquals("kna", JavaneseScript.toLatin(kna))
+
+        val kring = "ꦏ${JavaneseScript.CH_CAKRA}${JavaneseScript.CH_WULU}${JavaneseScript.CH_CECak}" // ka + cakra + wulu + cecak -> kring
+        assertEquals("kring", JavaneseScript.toLatin(kring))
+
+        val kreta = "ꦏ${JavaneseScript.CH_KERET}ꦠ" // ka + keret + ta -> kreta
+        assertEquals("kreta", JavaneseScript.toLatin(kreta))
+
+        val kya = "ꦏ${JavaneseScript.CH_PENGKAL}" // ka + pengkal -> kya
+        assertEquals("kya", JavaneseScript.toLatin(kya))
+
+        val visualKe = "${JavaneseScript.CH_TALING}ꦏ" // visual taling + ka -> ké
+        assertEquals("ké", JavaneseScript.toLatin(visualKe))
     }
 
     @Test

@@ -30,7 +30,13 @@ import android.view.View
 import android.view.ViewConfiguration
 import androidx.core.content.ContextCompat
 import com.clestial.keyboard.math.AiRouterClient
+import com.clestial.keyboard.math.FieldType
+import com.clestial.keyboard.math.FormulaCards
+import com.clestial.keyboard.math.InputFieldSpec
+import com.clestial.keyboard.math.MathModule
+import com.clestial.keyboard.math.MathRegistry
 import com.clestial.keyboard.math.ScientificCalculator
+import com.clestial.keyboard.math.SolveResult
 import kotlin.math.abs
 import kotlin.math.ceil
 import kotlin.math.max
@@ -339,6 +345,23 @@ class ClestialKeyboardView(context: Context) : View(context) {
     private var aiTarget = -1
     private var aiInputDownX = 0f
     private var aiInputStartScroll = 0f
+
+    // Panel Modul Matematika SMP Kelas 9 (11 Modul Eksak dalam keyboard).
+    private var mathOpen = false
+    private var mathActiveModule: MathModule = MathRegistry.modules.first()
+    private val mathInputs = LinkedHashMap<String, String>()
+    private var mathActiveFieldKey: String = ""
+    private var mathResult: SolveResult? = null
+    private var mathShowFormulas = false
+    private var mathDownKey = -1
+    private var mathTabScrollX = 0f
+    private var mathTouchDownX = 0f
+    private var mathTouchStartScrollX = 0f
+    private var mathTouchPointerId = -1
+    private var mathFormulaScrollY = 0f
+    private var mathFormulaDownY = 0f
+    private var mathFormulaStartScrollY = 0f
+    private var mathInputModeAlpha = false
     private val editRepeatRunnable = object : Runnable {
         override fun run() {
             val action = editActionFor(editDownButton) ?: return
@@ -580,7 +603,7 @@ class ClestialKeyboardView(context: Context) : View(context) {
 
     override fun onMeasure(widthMeasureSpec: Int, heightMeasureSpec: Int) {
         updateMetrics()
-        val rowCount = if (emojiOpen || clipOpen || editOpen || calcOpen) max(rows.size, PANEL_MIN_ROWS) else rows.size
+        val rowCount = if (emojiOpen || clipOpen || editOpen || calcOpen || mathOpen) max(rows.size, PANEL_MIN_ROWS) else rows.size
         val h = (rowHeight * rowCount + topTotal + bottomPad).toInt()
         setMeasuredDimension(MeasureSpec.getSize(widthMeasureSpec), h)
     }
@@ -648,6 +671,10 @@ class ClestialKeyboardView(context: Context) : View(context) {
         }
         if (calcOpen) {
             drawCalcPanel(canvas)
+            return
+        }
+        if (mathOpen) {
+            drawMathPanel(canvas)
             return
         }
         if (javaOpen) {
@@ -740,6 +767,7 @@ class ClestialKeyboardView(context: Context) : View(context) {
         4 -> R.drawable.ic_kb_calc
         5 -> R.drawable.ic_kb_java
         6 -> R.drawable.ic_kb_ai
+        7 -> R.drawable.ic_kb_math
         else -> null
     }
 
@@ -764,6 +792,7 @@ class ClestialKeyboardView(context: Context) : View(context) {
             4 -> openCalc()
             5 -> openJava()
             6 -> openAi()
+            7 -> openMath()
         }
     }
 
@@ -914,10 +943,15 @@ class ClestialKeyboardView(context: Context) : View(context) {
     }
 
     private fun drawLabel(canvas: Canvas, rect: RectF, text: String, size: Float, color: Int = palette.text) {
+        val origTf = textPaint.typeface
+        if (isJavanese(text)) {
+            textPaint.typeface = javaneseTypeface
+        }
         textPaint.textSize = size
         textPaint.color = color
         val y = rect.centerY() - (textPaint.ascent() + textPaint.descent()) / 2f
         canvas.drawText(text, rect.centerX(), y, textPaint)
+        textPaint.typeface = origTf
     }
 
     private fun drawIcon(canvas: Canvas, rect: RectF, res: Int, tint: Int = palette.text) {
@@ -966,6 +1000,7 @@ class ClestialKeyboardView(context: Context) : View(context) {
         if (clipOpen) return handleClipboardTouch(event)
         if (editOpen) return handleEditTouch(event)
         if (calcOpen) return handleCalcTouch(event)
+        if (mathOpen) return handleMathTouch(event)
         if (javaOpen) return handleJavaTouch(event)
         if (aiOpen) return handleAiTouch(event)
         if (trOpen) return handleTranslateTouch(event)
@@ -2572,6 +2607,10 @@ class ClestialKeyboardView(context: Context) : View(context) {
 
     /** Teks di tengah [rect], dikecilkan bila terlalu lebar. */
     private fun drawFittedLabel(canvas: Canvas, rect: RectF, text: String, color: Int) {
+        val origTf = textPaint.typeface
+        if (isJavanese(text)) {
+            textPaint.typeface = javaneseTypeface
+        }
         var size = rowHeight * 0.3f
         textPaint.textSize = size
         val limit = rect.width() * 0.86f
@@ -2582,6 +2621,7 @@ class ClestialKeyboardView(context: Context) : View(context) {
         textPaint.color = color
         val y = rect.centerY() - (textPaint.ascent() + textPaint.descent()) / 2f
         canvas.drawText(text, rect.centerX(), y, textPaint)
+        textPaint.typeface = origTf
     }
 
     private fun handleEditTouch(event: MotionEvent): Boolean {
@@ -3237,6 +3277,10 @@ class ClestialKeyboardView(context: Context) : View(context) {
     /** Teks di dalam [box] dengan paling banyak baris yang muat; diakhiri "…" bila terpotong. */
     private fun drawTextBlock(canvas: Canvas, text: String, box: RectF, sizeDp: Float, alpha: Int, center: Boolean) {
         if (text.isEmpty() || box.width() < 1f || box.height() < 1f) return
+        val origTf = clipTextPaint.typeface
+        if (isJavanese(text)) {
+            clipTextPaint.typeface = javaneseTypeface
+        }
         clipTextPaint.textSize = dp(sizeDp)
         clipTextPaint.color = palette.text
         clipTextPaint.alpha = alpha
@@ -3256,6 +3300,7 @@ class ClestialKeyboardView(context: Context) : View(context) {
         canvas.translate(box.left, box.top + if (center) max(0f, (box.height() - layout.height) / 2f) else 0f)
         layout.draw(canvas)
         canvas.restore()
+        clipTextPaint.typeface = origTf
         clipTextPaint.alpha = 255
     }
 
@@ -3615,18 +3660,544 @@ class ClestialKeyboardView(context: Context) : View(context) {
         }
     }
 
-    /** Buka layar penuh Kalkulator Matematika SMP Kelas 9 & Soal Cerita AI. */
+    /** Buka panel Kalkulator Matematika SMP Kelas 9 langsung di keyboard. */
     private fun openMathModules() {
+        openMath()
+    }
+
+    /** Buka panel Matematika SMP 9 berbasis 11 modul eksak langsung dalam keyboard. */
+    fun openMath(moduleId: String? = null) {
+        if (mathOpen && moduleId == null) return
+        closeResize()
+        closeTranslate()
         closeCalc()
         closeJava()
         closeAi()
-        val intent = Intent(context, MathModulesActivity::class.java)
-            .addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
-        try {
-            context.startActivity(intent)
-        } catch (e: Exception) {
-            // Tidak bisa membuka aktivitas modul matematika: abaikan.
+        closeClipboard()
+        closeEdit()
+        closeEmoji()
+        cancelTouches()
+        mathOpen = true
+        val target = if (moduleId != null) MathRegistry.find(moduleId) ?: MathRegistry.modules.first() else mathActiveModule
+        selectMathModule(target)
+        panelCancel()
+        updateMetrics()
+        requestLayout()
+        invalidate()
+    }
+
+    /** Tutup panel matematika dan kembali ke tampilan tombol utama. */
+    fun closeMath() {
+        if (!mathOpen) return
+        mathOpen = false
+        mathResult = null
+        mathShowFormulas = false
+        mathDownKey = -1
+        panelCancel()
+        updateMetrics()
+        requestLayout()
+        invalidate()
+    }
+
+    private fun selectMathModule(mod: MathModule, prefill: Map<String, String>? = null) {
+        mathActiveModule = mod
+        mathInputs.clear()
+        for (f in mod.fields) {
+            val defVal = prefill?.get(f.key) ?: f.defaultValue.ifEmpty {
+                if (f.type == FieldType.CHOICE && f.choices.isNotEmpty()) f.choices.first() else ""
+            }
+            mathInputs[f.key] = defVal
         }
+        mathActiveFieldKey = mod.fields.firstOrNull { it.type != FieldType.CHOICE }?.key ?: mod.fields.firstOrNull()?.key.orEmpty()
+        mathResult = null
+        mathShowFormulas = false
+        invalidate()
+    }
+
+    private fun runMathSolver() {
+        mathResult = mathActiveModule.solve(mathInputs)
+        invalidate()
+    }
+
+    private fun mathModuleShortName(mod: MathModule): String = when (mod.id) {
+        "spldv" -> "1. SPLDV"
+        "power_root" -> "2. Pangkat"
+        "quadratic_eq" -> "3. Kuadrat"
+        "quadratic_func" -> "4. F.Kuadrat"
+        "geom_trans" -> "5. Transformasi"
+        "congruence_sim" -> "6. Kesebangunan"
+        "curved_solid" -> "7. BRSL"
+        "statistics" -> "8. Statistika"
+        "probability" -> "9. Peluang"
+        "linear_line" -> "10. Garis"
+        "plsv" -> "11. PLSV"
+        else -> mod.name
+    }
+
+    private data class MathGeo(
+        val panel: PanelGeo,
+        val back: RectF,
+        val formulaBtn: RectF,
+        val aiBtn: RectF,
+        val tabsRow: RectF,
+        val moduleTabs: List<Pair<MathModule, RectF>>,
+        val fieldsRow: RectF,
+        val fieldBoxes: List<Pair<InputFieldSpec, RectF>>,
+        val resultCard: RectF,
+        val btnInsertAnswer: RectF,
+        val btnInsertFull: RectF,
+        val keys: List<Pair<CalcKey, RectF>>,
+        val formulaArea: RectF,
+        val formulaCloseBtn: RectF
+    )
+
+    private fun mathRows(): List<List<CalcKey>> = if (!mathInputModeAlpha) {
+        listOf(
+            listOf(
+                CalcKey("7", "7", 0),
+                CalcKey("8", "8", 0),
+                CalcKey("9", "9", 0),
+                CalcKey("÷", "÷", 1),
+                CalcKey("AC", "AC", 1)
+            ),
+            listOf(
+                CalcKey("4", "4", 0),
+                CalcKey("5", "5", 0),
+                CalcKey("6", "6", 0),
+                CalcKey("×", "×", 1),
+                CalcKey("⌫", "DEL", 1)
+            ),
+            listOf(
+                CalcKey("1", "1", 0),
+                CalcKey("2", "2", 0),
+                CalcKey("3", "3", 0),
+                CalcKey("-", "-", 1),
+                CalcKey("TAB", "TAB", 1)
+            ),
+            listOf(
+                CalcKey("x/y", "MODE", 1, 0.9f),
+                CalcKey("0", "0", 0, 0.9f),
+                CalcKey(",", ",", 0, 0.7f),
+                CalcKey("/", "/", 1, 0.7f),
+                CalcKey("+", "+", 1, 0.8f),
+                CalcKey("HITUNG", "SOLVE", 2, 1.4f)
+            )
+        )
+    } else {
+        listOf(
+            listOf(
+                CalcKey("x", "x", 0),
+                CalcKey("y", "y", 0),
+                CalcKey("(", "(", 1),
+                CalcKey(")", ")", 1),
+                CalcKey("AC", "AC", 1)
+            ),
+            listOf(
+                CalcKey("=", "=", 1),
+                CalcKey("<", "<", 1),
+                CalcKey(">", ">", 1),
+                CalcKey("^", "^", 1),
+                CalcKey("⌫", "DEL", 1)
+            ),
+            listOf(
+                CalcKey("≤", "<=", 1),
+                CalcKey("≥", ">=", 1),
+                CalcKey("f(x)", "f(", 1),
+                CalcKey("-", "-", 1),
+                CalcKey("TAB", "TAB", 1)
+            ),
+            listOf(
+                CalcKey("123", "MODE", 1, 1.1f),
+                CalcKey(" ", " ", 0, 1.2f),
+                CalcKey(",", ",", 0, 0.8f),
+                CalcKey("+", "+", 1, 0.8f),
+                CalcKey("HITUNG", "SOLVE", 2, 1.4f)
+            )
+        )
+    }
+
+    private fun mathGeo(): MathGeo {
+        val g = panelGeo()
+        val margin = clipMargin()
+        val back = toolBarBackRect(g)
+        val formulaW = dp(64f)
+        val aiW = dp(38f)
+        val formulaBtn = RectF(width - margin - formulaW, g.tabsTop, width - margin, g.tabsBottom)
+        val aiBtn = RectF(formulaBtn.left - dp(6f) - aiW, g.tabsTop, formulaBtn.left - dp(6f), g.tabsBottom)
+
+        val tabH = dp(30f)
+        val tabsRow = RectF(margin, g.tabsBottom + dp(2f), width - margin, g.tabsBottom + dp(2f) + tabH)
+        val tabGap = dp(4f)
+        val moduleTabs = ArrayList<Pair<MathModule, RectF>>(11)
+        var tabX = tabsRow.left - mathTabScrollX
+        for (m in MathRegistry.modules) {
+            val text = mathModuleShortName(m)
+            val w = headerPaint.measureText(text) + dp(18f)
+            moduleTabs.add(m to RectF(tabX, tabsRow.top + dp(2f), tabX + w, tabsRow.bottom - dp(2f)))
+            tabX += w + tabGap
+        }
+
+        val mainTop = tabsRow.bottom + dp(3f)
+        val mainBottom = g.gridBottom
+        val availH = (mainBottom - mainTop).coerceAtLeast(dp(120f))
+
+        val formulaArea = RectF(margin, mainTop, width - margin, mainBottom - dp(40f))
+        val formulaCloseBtn = RectF(width / 2f - dp(75f), mainBottom - dp(36f), width / 2f + dp(75f), mainBottom - dp(4f))
+
+        // Fields & Result Card
+        val topSecH = (availH * 0.46f).coerceIn(dp(85f), dp(135f))
+        val fieldsRowH = dp(28f)
+        val fieldsRow = RectF(margin, mainTop, width - margin, mainTop + fieldsRowH)
+
+        val activeFields = mathActiveModule.fields
+        val fieldBoxes = ArrayList<Pair<InputFieldSpec, RectF>>(activeFields.size)
+        if (activeFields.isNotEmpty()) {
+            val fGap = dp(3f)
+            val fTotalW = (width - 2 * margin - fGap * (activeFields.size - 1)).coerceAtLeast(dp(40f))
+            val fUnitW = fTotalW / activeFields.size
+            var fx = margin
+            for (f in activeFields) {
+                fieldBoxes.add(f to RectF(fx, fieldsRow.top, fx + fUnitW, fieldsRow.bottom))
+                fx += fUnitW + fGap
+            }
+        }
+
+        val resultCardTop = fieldsRow.bottom + dp(3f)
+        val keysTop = mainTop + topSecH + dp(3f)
+        val resultCard = RectF(margin, resultCardTop, width - margin, keysTop - dp(3f))
+
+        val btnW = dp(84f)
+        val btnH = (resultCard.height() * 0.44f).coerceIn(dp(22f), dp(30f))
+        val btnInsertAnswer = RectF(resultCard.right - btnW - dp(4f), resultCard.top + dp(4f), resultCard.right - dp(4f), resultCard.top + dp(4f) + btnH)
+        val btnInsertFull = RectF(resultCard.right - btnW - dp(4f), resultCard.bottom - dp(4f) - btnH, resultCard.right - dp(4f), resultCard.bottom - dp(4f))
+
+        // Keys Grid
+        val keysBottom = mainBottom
+        val rowsList = mathRows()
+        val rowH = ((keysBottom - keysTop) / rowsList.size).coerceAtLeast(dp(20f))
+        val gap = dp(3.5f)
+        val keyPairs = ArrayList<Pair<CalcKey, RectF>>(25)
+
+        rowsList.forEachIndexed { r, row ->
+            val totalW = row.sumOf { it.weight.toDouble() }.toFloat()
+            val totalUsable = (width - 2 * margin - gap * (row.size - 1)).coerceAtLeast(dp(60f))
+            val unitW = totalUsable / totalW
+            var x = margin
+            val rTop = keysTop + r * rowH + dp(1.5f)
+            val rBot = keysTop + (r + 1) * rowH - dp(1.5f)
+            for (k in row) {
+                val w = k.weight * unitW
+                keyPairs.add(k to RectF(x, rTop, x + w, rBot))
+                x += w + gap
+            }
+        }
+
+        return MathGeo(
+            g, back, formulaBtn, aiBtn, tabsRow, moduleTabs,
+            fieldsRow, fieldBoxes, resultCard, btnInsertAnswer, btnInsertFull,
+            keyPairs, formulaArea, formulaCloseBtn
+        )
+    }
+
+    private fun drawMathPanel(canvas: Canvas) {
+        val m = mathGeo()
+        drawToolBarButton(canvas, m.back, R.drawable.ic_kb_back, true, panelTouchActive && mathDownKey == MATH_T_BACK)
+        drawToolBarTitle(canvas, m.panel, context.getString(R.string.math_panel_title))
+
+        // Tombol Rumus
+        drawPanelFace(canvas, m.formulaBtn, panelTouchActive && mathDownKey == MATH_T_FORMULA)
+        drawFittedLabel(canvas, m.formulaBtn, context.getString(R.string.math_btn_formula), if (mathShowFormulas) palette.accent else palette.text)
+
+        // Tombol AI
+        fillPaint.color = if (panelTouchActive && mathDownKey == MATH_T_AI) palette.accentPressed else palette.accent
+        canvas.drawRoundRect(m.aiBtn, radius, radius, fillPaint)
+        drawFittedLabel(canvas, m.aiBtn, "AI", palette.onAccent)
+
+        // Baris Tab Modul
+        canvas.save()
+        canvas.clipRect(m.tabsRow)
+        for ((mod, rect) in m.moduleTabs) {
+            val isSel = mod.id == mathActiveModule.id
+            fillPaint.color = if (isSel) palette.accent else palette.key
+            canvas.drawRoundRect(rect, radius * 0.8f, radius * 0.8f, fillPaint)
+            val fg = if (isSel) palette.onAccent else palette.text
+            drawFittedLabel(canvas, rect, mathModuleShortName(mod), fg)
+        }
+        canvas.restore()
+
+        if (mathShowFormulas) {
+            // Tampilan Kartu Rumus
+            fillPaint.color = palette.key
+            canvas.drawRoundRect(m.formulaArea, radius, radius, fillPaint)
+            strokePaint.color = (palette.text and 0x00FFFFFF) or (0x2A shl 24)
+            strokePaint.strokeWidth = dp(1f)
+            canvas.drawRoundRect(m.formulaArea, radius, radius, strokePaint)
+
+            val cards = FormulaCards.forModule(mathActiveModule.id)
+            val formulaText = buildString {
+                if (cards.isNotEmpty()) {
+                    for (c in cards) {
+                        appendLine("【${c.title}】")
+                        appendLine(c.formula)
+                        appendLine("Catatan: ${c.notes}\n")
+                    }
+                } else {
+                    appendLine(mathActiveModule.name)
+                    appendLine(mathActiveModule.description)
+                }
+            }.trim()
+
+            val innerFormula = RectF(
+                m.formulaArea.left + dp(8f), m.formulaArea.top + dp(6f),
+                m.formulaArea.right - dp(8f), m.formulaArea.bottom - dp(6f)
+            )
+            drawTextBlock(canvas, formulaText, innerFormula, 11f, 255, false)
+
+            fillPaint.color = palette.accent
+            canvas.drawRoundRect(m.formulaCloseBtn, radius, radius, fillPaint)
+            drawFittedLabel(canvas, m.formulaCloseBtn, "Tutup Rumus", palette.onAccent)
+            return
+        }
+
+        // 1. Kotak Baris Input
+        for ((spec, rect) in m.fieldBoxes) {
+            val isActive = spec.key == mathActiveFieldKey
+            val curVal = mathInputs[spec.key].orEmpty()
+            fillPaint.color = if (isActive) palette.keyPressed else palette.key
+            canvas.drawRoundRect(rect, radius * 0.8f, radius * 0.8f, fillPaint)
+            strokePaint.color = if (isActive) palette.accent else ((palette.text and 0x00FFFFFF) or (0x33 shl 24))
+            strokePaint.strokeWidth = if (isActive) dp(1.6f) else dp(0.8f)
+            canvas.drawRoundRect(rect, radius * 0.8f, radius * 0.8f, strokePaint)
+
+            val disp = when {
+                spec.type == FieldType.CHOICE -> "${spec.label}: $curVal ▾"
+                curVal.isEmpty() -> "${spec.label}: -"
+                else -> "${spec.label}: $curVal"
+            }
+            val fg = if (isActive) palette.accent else palette.text
+            drawFittedLabel(canvas, rect, disp, fg)
+        }
+
+        // 2. Kartu Hasil Solver
+        fillPaint.color = palette.key
+        canvas.drawRoundRect(m.resultCard, radius, radius, fillPaint)
+        strokePaint.color = (palette.text and 0x00FFFFFF) or (0x2A shl 24)
+        strokePaint.strokeWidth = dp(1f)
+        canvas.drawRoundRect(m.resultCard, radius, radius, strokePaint)
+
+        val res = mathResult
+        if (res == null) {
+            val hintText = "${mathActiveModule.name}\n${mathActiveModule.description}\nIsi parameter di atas lalu tekan [HITUNG]."
+            val box = RectF(m.resultCard.left + dp(8f), m.resultCard.top + dp(4f), m.resultCard.right - dp(8f), m.resultCard.bottom - dp(4f))
+            drawTextBlock(canvas, hintText, box, 10.5f, 160, false)
+        } else if (!res.ok) {
+            val errBox = RectF(m.resultCard.left + dp(8f), m.resultCard.top + dp(4f), m.resultCard.right - dp(8f), m.resultCard.bottom - dp(4f))
+            clipTextPaint.color = 0xFFE53935.toInt()
+            drawTextBlock(canvas, "Error: ${res.error}", errBox, 11f, 255, false)
+        } else {
+            // Tampilan Hasil Sukses
+            val textRight = m.btnInsertAnswer.left - dp(6f)
+            val infoBox = RectF(m.resultCard.left + dp(8f), m.resultCard.top + dp(4f), textRight, m.resultCard.bottom - dp(4f))
+
+            val answerText = "Jawaban: ${res.answer}"
+            val stepSummary = res.steps.firstOrNull()?.let { "1. $it" }.orEmpty()
+            val checkText = if (res.check.isNotEmpty()) "Cek: ${res.check}" else ""
+            val fullText = "$answerText\n$stepSummary\n$checkText".trim()
+
+            drawTextBlock(canvas, fullText, infoBox, 10.5f, 255, false)
+
+            // Tombol Sisipkan Jawaban
+            fillPaint.color = if (panelTouchActive && mathDownKey == MATH_T_INSERT_ANS) palette.accentPressed else palette.accent
+            canvas.drawRoundRect(m.btnInsertAnswer, radius * 0.8f, radius * 0.8f, fillPaint)
+            drawFittedLabel(canvas, m.btnInsertAnswer, context.getString(R.string.math_insert_ans), palette.onAccent)
+
+            // Tombol Sisipkan Lengkap
+            fillPaint.color = if (panelTouchActive && mathDownKey == MATH_T_INSERT_FULL) palette.modKeyPressed else palette.modKey
+            canvas.drawRoundRect(m.btnInsertFull, radius * 0.8f, radius * 0.8f, fillPaint)
+            drawFittedLabel(canvas, m.btnInsertFull, context.getString(R.string.math_insert_full), palette.text)
+        }
+
+        // 3. Grid Tombol Input
+        m.keys.forEachIndexed { idx, (key, rect) ->
+            val held = panelTouchActive && mathDownKey == (MATH_T_KEY_OFFSET + idx)
+            val bg = when (key.kind) {
+                2 -> if (held) palette.accentPressed else palette.accent
+                1 -> if (held) palette.modKeyPressed else palette.modKey
+                else -> if (held) palette.keyPressed else palette.key
+            }
+            val fg = when (key.kind) {
+                2 -> palette.onAccent
+                else -> palette.text
+            }
+            fillPaint.color = palette.shadow
+            canvas.drawRoundRect(rect.left, rect.top + dp(1f), rect.right, rect.bottom + dp(1f), radius, radius, fillPaint)
+            fillPaint.color = bg
+            canvas.drawRoundRect(rect, radius, radius, fillPaint)
+            drawFittedLabel(canvas, rect, key.label, fg)
+        }
+    }
+
+    private fun handleMathTouch(event: MotionEvent): Boolean {
+        val m = mathGeo()
+        val pad = dp(4f)
+        when (event.actionMasked) {
+            MotionEvent.ACTION_DOWN -> {
+                cancelTouches()
+                val x = event.x
+                val y = event.y
+                mathTouchPointerId = event.getPointerId(0)
+                panelTouchActive = true
+                mathDownKey = -1
+
+                when {
+                    m.back.padded(pad).contains(x, y) -> mathDownKey = MATH_T_BACK
+                    m.formulaBtn.padded(pad).contains(x, y) -> mathDownKey = MATH_T_FORMULA
+                    m.aiBtn.padded(pad).contains(x, y) -> mathDownKey = MATH_T_AI
+                    mathShowFormulas && m.formulaCloseBtn.contains(x, y) -> mathDownKey = MATH_T_FORMULA_CLOSE
+                    !mathShowFormulas && mathResult?.ok == true && m.btnInsertAnswer.contains(x, y) -> mathDownKey = MATH_T_INSERT_ANS
+                    !mathShowFormulas && mathResult?.ok == true && m.btnInsertFull.contains(x, y) -> mathDownKey = MATH_T_INSERT_FULL
+                    m.tabsRow.contains(x, y) -> {
+                        mathTouchDownX = x
+                        mathTouchStartScrollX = mathTabScrollX
+                        m.moduleTabs.forEachIndexed { idx, (_, r) ->
+                            if (r.contains(x, y)) mathDownKey = MATH_T_TAB_OFFSET + idx
+                        }
+                    }
+                    !mathShowFormulas -> {
+                        m.fieldBoxes.forEachIndexed { idx, (_, r) ->
+                            if (r.contains(x, y)) mathDownKey = MATH_T_FIELD_OFFSET + idx
+                        }
+                        if (mathDownKey == -1) {
+                            m.keys.forEachIndexed { idx, (_, r) ->
+                                if (r.contains(x, y)) mathDownKey = MATH_T_KEY_OFFSET + idx
+                            }
+                        }
+                    }
+                }
+                if (mathDownKey != -1) feedback(KeyType.CHARACTER)
+                invalidate()
+            }
+            MotionEvent.ACTION_MOVE -> {
+                val x = event.x
+                val y = event.y
+                if (m.tabsRow.contains(x, y)) {
+                    val maxScroll = (m.moduleTabs.lastOrNull()?.second?.right ?: width.toFloat()) - m.tabsRow.right + mathTabScrollX
+                    if (maxScroll > 0f) {
+                        mathTabScrollX = (mathTouchStartScrollX - (x - mathTouchDownX)).coerceIn(0f, maxScroll)
+                        invalidate()
+                    }
+                }
+            }
+            MotionEvent.ACTION_UP -> {
+                val x = event.x
+                val y = event.y
+                when {
+                    mathDownKey == MATH_T_BACK && m.back.padded(pad).contains(x, y) -> closeMath()
+                    mathDownKey == MATH_T_FORMULA && m.formulaBtn.padded(pad).contains(x, y) -> {
+                        mathShowFormulas = !mathShowFormulas
+                        invalidate()
+                    }
+                    mathDownKey == MATH_T_AI && m.aiBtn.padded(pad).contains(x, y) -> {
+                        closeMath()
+                        openAi()
+                    }
+                    mathDownKey == MATH_T_FORMULA_CLOSE && m.formulaCloseBtn.contains(x, y) -> {
+                        mathShowFormulas = false
+                        invalidate()
+                    }
+                    mathDownKey == MATH_T_INSERT_ANS && m.btnInsertAnswer.contains(x, y) -> {
+                        val ans = mathResult?.answer
+                        if (!ans.isNullOrEmpty()) {
+                            listener?.onInsertText(ans)
+                        }
+                    }
+                    mathDownKey == MATH_T_INSERT_FULL && m.btnInsertFull.contains(x, y) -> {
+                        val res = mathResult
+                        if (res != null && res.ok) {
+                            val full = buildString {
+                                appendLine("Materi: ${mathActiveModule.name}")
+                                appendLine("Jawaban: ${res.answer}")
+                                appendLine("Langkah-langkah:")
+                                res.steps.forEachIndexed { i, s -> appendLine("${i + 1}. $s") }
+                                if (res.check.isNotEmpty()) appendLine("Cek: ${res.check}")
+                            }
+                            listener?.onInsertText(full)
+                        }
+                    }
+                    mathDownKey in MATH_T_TAB_OFFSET until (MATH_T_TAB_OFFSET + 20) -> {
+                        val idx = mathDownKey - MATH_T_TAB_OFFSET
+                        if (idx in MathRegistry.modules.indices) {
+                            selectMathModule(MathRegistry.modules[idx])
+                        }
+                    }
+                    mathDownKey in MATH_T_FIELD_OFFSET until (MATH_T_FIELD_OFFSET + 30) -> {
+                        val idx = mathDownKey - MATH_T_FIELD_OFFSET
+                        if (idx in mathActiveModule.fields.indices) {
+                            val spec = mathActiveModule.fields[idx]
+                            if (spec.type == FieldType.CHOICE && spec.choices.isNotEmpty()) {
+                                val cur = mathInputs[spec.key].orEmpty()
+                                val cIdx = spec.choices.indexOf(cur)
+                                val nextChoice = spec.choices[(cIdx + 1) % spec.choices.size]
+                                mathInputs[spec.key] = nextChoice
+                                mathResult = null
+                                invalidate()
+                            } else {
+                                mathActiveFieldKey = spec.key
+                                invalidate()
+                            }
+                        }
+                    }
+                    mathDownKey in MATH_T_KEY_OFFSET until (MATH_T_KEY_OFFSET + 50) -> {
+                        val idx = mathDownKey - MATH_T_KEY_OFFSET
+                        if (idx in m.keys.indices) {
+                            val key = m.keys[idx].first
+                            when (key.action) {
+                                "AC" -> {
+                                    mathInputs[mathActiveFieldKey] = ""
+                                    mathResult = null
+                                }
+                                "DEL" -> {
+                                    val cur = mathInputs[mathActiveFieldKey].orEmpty()
+                                    if (cur.isNotEmpty()) {
+                                        mathInputs[mathActiveFieldKey] = cur.dropLast(1)
+                                        mathResult = null
+                                    }
+                                }
+                                "TAB" -> {
+                                    val fields = mathActiveModule.fields
+                                    if (fields.isNotEmpty()) {
+                                        val curIdx = fields.indexOfFirst { it.key == mathActiveFieldKey }
+                                        val nextIdx = (curIdx + 1) % fields.size
+                                        mathActiveFieldKey = fields[nextIdx].key
+                                    }
+                                }
+                                "MODE" -> {
+                                    mathInputModeAlpha = !mathInputModeAlpha
+                                }
+                                "SOLVE" -> runMathSolver()
+                                else -> {
+                                    val cur = mathInputs[mathActiveFieldKey].orEmpty()
+                                    if (cur.length < 35) {
+                                        mathInputs[mathActiveFieldKey] = cur + key.action
+                                        mathResult = null
+                                    }
+                                }
+                            }
+                            invalidate()
+                        }
+                    }
+                }
+                panelTouchActive = false
+                mathDownKey = -1
+                invalidate()
+            }
+            MotionEvent.ACTION_CANCEL -> {
+                panelTouchActive = false
+                mathDownKey = -1
+                invalidate()
+            }
+        }
+        return true
     }
 
     // -------------------------------------------------------- Utilitas buffer input overlay
@@ -3735,6 +4306,10 @@ class ClestialKeyboardView(context: Context) : View(context) {
             inputRect.left + dp(10f), inputRect.top + dp(3f),
             inputRect.right - dp(10f), inputRect.bottom - dp(3f)
         )
+        val origTf = clipTextPaint.typeface
+        if (isJavanese(text) || isJavanese(hint)) {
+            clipTextPaint.typeface = javaneseTypeface
+        }
         val textSize = trInputTextSize()
         clipTextPaint.textSize = textSize
         clipTextPaint.color = palette.text
@@ -3758,6 +4333,8 @@ class ClestialKeyboardView(context: Context) : View(context) {
         canvas.drawLine(cursorX, inner.centerY() - cHalf, cursorX, inner.centerY() + cHalf, strokePaint)
         strokePaint.alpha = 255
         canvas.restore()
+        clipTextPaint.typeface = origTf
+        clipTextPaint.alpha = 255
         clipTextPaint.alpha = 255
     }
 
@@ -4324,10 +4901,14 @@ class ClestialKeyboardView(context: Context) : View(context) {
     private fun javaPadRows(): List<List<JavaPadKey>> = if (javaPage == 0) {
         listOf(
             JavaneseScript.CARAKAN.subList(0, 10).map {
-                JavaPadKey(it.glyph, if (javaPasanganMode) "-${it.latin}" else it.latin, "C:${it.glyph}", 0)
+                val glyphLabel = if (javaPasanganMode) "\u25CC\uA9C0${it.glyph}" else it.glyph
+                val subLabel = if (javaPasanganMode) "-${it.latin}" else it.latin
+                JavaPadKey(glyphLabel, subLabel, "C:${it.glyph}", 0)
             },
             JavaneseScript.CARAKAN.subList(10, 20).map {
-                JavaPadKey(it.glyph, if (javaPasanganMode) "-${it.latin}" else it.latin, "C:${it.glyph}", 0)
+                val glyphLabel = if (javaPasanganMode) "\u25CC\uA9C0${it.glyph}" else it.glyph
+                val subLabel = if (javaPasanganMode) "-${it.latin}" else it.latin
+                JavaPadKey(glyphLabel, subLabel, "C:${it.glyph}", 0)
             },
             JavaneseScript.SANDHANGAN_UTAMA.map {
                 JavaPadKey(it.label, it.hint, "I:${it.insert}", 1)
@@ -4660,6 +5241,7 @@ class ClestialKeyboardView(context: Context) : View(context) {
         val back: RectF,
         val clear: RectF,
         val title: RectF,
+        val keyBtn: RectF,
         val smp: RectF
     )
 
@@ -4669,6 +5251,7 @@ class ClestialKeyboardView(context: Context) : View(context) {
         closeTranslate()
         closeCalc()
         closeJava()
+        closeMath()
         closeClipboard()
         closeEdit()
         closeEmoji()
@@ -4678,7 +5261,11 @@ class ClestialKeyboardView(context: Context) : View(context) {
         aiInput = ""
         aiCursor = 0
         aiScrollX = 0f
-        aiResult = ""
+        aiResult = if (prefs.chatGptApiKey.isEmpty()) {
+            "Selamat datang di AI ClestialKeyboard! Ketuk tombol [+ Key] di atas untuk menempelkan OpenAI API Key (sk-...) Anda."
+        } else {
+            ""
+        }
         aiBusy = false
         aiRequestId++
         aiOpen = true
@@ -4711,13 +5298,15 @@ class ClestialKeyboardView(context: Context) : View(context) {
         val t = trHeaderGeo()
         val barRowH = t.back.height()
         val margin = clipMargin()
-        val hGap = dp(6f)
+        val hGap = dp(5f)
         val back = RectF(margin, t.back.top, margin + barRowH, t.back.bottom)
         val clear = RectF(back.right + hGap, t.back.top, back.right + hGap + barRowH, t.back.bottom)
-        val smpW = dp(64f)
+        val smpW = dp(58f)
         val smp = RectF(width - margin - smpW, t.back.top, width - margin, t.back.bottom)
-        val title = RectF(clear.right + hGap, t.back.top, (smp.left - hGap).coerceAtLeast(clear.right + hGap + dp(40f)), t.back.bottom)
-        return AiHeaderGeo(t.input, t.enter, t.result, t.replace, t.insert, back, clear, title, smp)
+        val keyW = dp(68f)
+        val keyBtn = RectF(smp.left - hGap - keyW, t.back.top, smp.left - hGap, t.back.bottom)
+        val title = RectF(clear.right + hGap, t.back.top, (keyBtn.left - hGap).coerceAtLeast(clear.right + hGap + dp(20f)), t.back.bottom)
+        return AiHeaderGeo(t.input, t.enter, t.result, t.replace, t.insert, back, clear, title, keyBtn, smp)
     }
 
     private fun aiEnsureCursorVisible() {
@@ -4750,11 +5339,22 @@ class ClestialKeyboardView(context: Context) : View(context) {
     private fun aiRun() {
         val q = aiInput.trim()
         if (q.isEmpty() || aiBusy) return
+
+        // Jika pengguna memasukkan atau menempelkan OpenAI API Key langsung
+        if (q.startsWith("sk-") && q.length > 20) {
+            prefs.chatGptApiKey = q
+            aiInput = ""
+            aiCursor = 0
+            aiResult = "Kunci API ChatGPT berhasil disimpan dan aktif! Silakan ketik pertanyaan atau soal tugas Anda."
+            invalidate()
+            return
+        }
+
         val reqId = ++aiRequestId
         aiBusy = true
         aiResult = ""
         invalidate()
-        AiRouterClient.askQuestion(prefs.aiProxyUrl, q) { res ->
+        AiRouterClient.askQuestion(prefs, q) { res ->
             if (reqId != aiRequestId || !aiOpen) return@askQuestion
             aiBusy = false
             aiResult = if (res.ok) res.text else res.error
@@ -4800,10 +5400,23 @@ class ClestialKeyboardView(context: Context) : View(context) {
             canInsert, panelTouchActive && aiTarget == AI_T_INSERT
         )
 
-        // Baris 3: Kembali, Hapus, Judul, SMP 9
+        // Baris 3: Kembali, Hapus, Judul/Status ChatGPT, Tombol Akun/Key, Tombol SMP 9
         drawToolBarButton(canvas, a.back, R.drawable.ic_kb_back, true, panelTouchActive && aiTarget == AI_T_BACK)
         drawToolBarButton(canvas, a.clear, R.drawable.ic_kb_close, aiInput.isNotEmpty(), panelTouchActive && aiTarget == AI_T_CLEAR)
-        drawFittedLabel(canvas, a.title, context.getString(R.string.ai_title), palette.text)
+
+        val hasKey = prefs.chatGptApiKey.isNotEmpty()
+        val titleText = if (hasKey) "ChatGPT" else "ChatGPT (!)"
+        val titleColor = if (hasKey) palette.text else 0xFFFFA000.toInt()
+        drawFittedLabel(canvas, a.title, titleText, titleColor)
+
+        // Tombol Akun / Key
+        fillPaint.color = if (panelTouchActive && aiTarget == AI_T_KEY) palette.modKeyPressed else if (hasKey) palette.key else palette.accent
+        canvas.drawRoundRect(a.keyBtn, radius, radius, fillPaint)
+        val keyLabel = if (hasKey) context.getString(R.string.ai_btn_key) else "+ Key"
+        val keyFg = if (hasKey) palette.text else palette.onAccent
+        drawFittedLabel(canvas, a.keyBtn, keyLabel, keyFg)
+
+        // Tombol SMP 9
         fillPaint.color = if (panelTouchActive && aiTarget == AI_T_SMP) palette.accentPressed else palette.accent
         canvas.drawRoundRect(a.smp, radius, radius, fillPaint)
         drawFittedLabel(canvas, a.smp, context.getString(R.string.calc_modules_btn), palette.onAccent)
@@ -4815,6 +5428,7 @@ class ClestialKeyboardView(context: Context) : View(context) {
         return when {
             a.back.padded(pad).contains(x, y) -> AI_T_BACK
             a.clear.padded(pad).contains(x, y) -> AI_T_CLEAR
+            a.keyBtn.padded(pad).contains(x, y) -> AI_T_KEY
             a.smp.padded(pad).contains(x, y) -> AI_T_SMP
             aiInput.isNotBlank() && !aiBusy && a.enter.padded(pad).contains(x, y) -> AI_T_ENTER
             a.input.contains(x, y) -> AI_T_INPUT
@@ -4910,6 +5524,25 @@ class ClestialKeyboardView(context: Context) : View(context) {
                                 aiBusy = false
                                 aiRequestId++
                                 syncBufferAutoShift(aiInput, aiCursor)
+                            }
+                            AI_T_KEY -> {
+                                val cm = context.getSystemService(Context.CLIPBOARD_SERVICE) as? ClipboardManager
+                                val clipText = cm?.primaryClip?.getItemAt(0)?.text?.toString()?.trim()
+                                if (clipText != null && (clipText.startsWith("sk-") || clipText.startsWith("sess-")) && clipText.length > 20) {
+                                    prefs.chatGptApiKey = clipText
+                                    aiInput = ""
+                                    aiCursor = 0
+                                    aiResult = "Akun ChatGPT terhubung!\n(Key: ${clipText.take(7)}...${clipText.takeLast(4)})\nSilakan ketik pertanyaan atau soal tugas Anda lalu tekan Enter."
+                                } else if (prefs.chatGptApiKey.isNotEmpty()) {
+                                    aiInput = prefs.chatGptApiKey
+                                    aiCursor = aiInput.length
+                                    aiResult = "Kunci API aktif: ${prefs.chatGptApiKey.take(7)}...${prefs.chatGptApiKey.takeLast(4)}\nEdit atau tempel kunci baru lalu tekan Enter."
+                                } else {
+                                    aiInput = "sk-"
+                                    aiCursor = aiInput.length
+                                    aiResult = "Salin OpenAI API Key Anda (sk-...) dari platform/browser, lalu ketuk tombol ini lagi untuk langsung menautkannya, atau ketik manual dan tekan Enter."
+                                }
+                                aiEnsureCursorVisible()
                             }
                             AI_T_SMP -> openMathModules()
                             AI_T_INPUT -> {
@@ -5114,6 +5747,28 @@ class ClestialKeyboardView(context: Context) : View(context) {
             Typeface.DEFAULT_BOLD
         }
 
+    /** Font resmi Noto Sans Javanese untuk ligatur dan sandhangan Aksara Jawa yang presisi. */
+    private val javaneseTypeface: Typeface by lazy {
+        try {
+            Typeface.createFromAsset(context.assets, "fonts/NotoSansJavanese-Regular.ttf")
+        } catch (e: Exception) {
+            try {
+                Typeface.createFromFile("/system/fonts/NotoSansJavanese-Regular.ttf")
+            } catch (e2: Exception) {
+                Typeface.DEFAULT
+            }
+        }
+    }
+
+    private fun isJavanese(text: CharSequence?): Boolean {
+        if (text == null) return false
+        for (i in 0 until text.length) {
+            val ch = text[i]
+            if (ch in '\uA980'..'\uA9DF' || ch == '\u25CC') return true
+        }
+        return false
+    }
+
     @Suppress("DEPRECATION")
     private fun createVibrator(context: Context): Vibrator? {
         return if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S) {
@@ -5216,9 +5871,21 @@ class ClestialKeyboardView(context: Context) : View(context) {
         const val AI_T_REPLACE = 5
         const val AI_T_INSERT = 6
         const val AI_T_INPUT = 7
+        const val AI_T_KEY = 8
 
-        // Jumlah slot alat yang aktif di bilah Tools keyboard (0..6).
-        const val TOOLS_PLACEHOLDER_COUNT = 7
+        // Panel Modul Matematika SMP 9
+        const val MATH_T_BACK = 100
+        const val MATH_T_FORMULA = 101
+        const val MATH_T_AI = 102
+        const val MATH_T_INSERT_ANS = 103
+        const val MATH_T_INSERT_FULL = 104
+        const val MATH_T_FORMULA_CLOSE = 105
+        const val MATH_T_TAB_OFFSET = 200
+        const val MATH_T_FIELD_OFFSET = 300
+        const val MATH_T_KEY_OFFSET = 400
+
+        // Jumlah slot alat yang aktif di bilah Tools keyboard (0..7).
+        const val TOOLS_PLACEHOLDER_COUNT = 8
 
         // Kolom saran: tiga kotak. Urutan kotak kiri, tengah, kanan memakai saran ke-2, ke-1, ke-3.
         const val SUGGESTION_COUNT = 3

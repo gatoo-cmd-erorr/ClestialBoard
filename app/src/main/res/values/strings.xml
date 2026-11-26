@@ -77,6 +77,14 @@
     <string name="math_story_confirm">Konfirmasi &amp; Hitung (Solver)</string>
     <string name="math_story_edit">Edit Manual</string>
     <string name="math_solve_btn">Hitung dengan Solver</string>
+    <string name="math_panel_title">Matematika SMP 9</string>
+    <string name="math_insert_ans">Sisipkan Jwb</string>
+    <string name="math_insert_full">Sisipkan Lengkap</string>
+    <string name="math_btn_formula">Rumus</string>
+    <string name="math_btn_solve">HITUNG</string>
+    <string name="ai_btn_key">Akun / Key</string>
+    <string name="ai_key_connected">ChatGPT Aktif</string>
+    <string name="ai_key_missing">Belum ada Key</string>
     <string name="math_explain_btn">Penjelasan AI (9router)</string>
     <string name="math_copy_btn">Salin Hasil</string>
     <string name="math_proxy_label">URL Proxy AI 9router (tanpa API key di HP)</string>

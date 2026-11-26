@@ -129,11 +129,36 @@ object JavaneseScript {
 
         while (i < n) {
             val ch = input[i]
+
+            // Dukungan urutan visual Taling (ꦺ) diketik mendahului Carakan
+            if (ch == CH_TALING && i + 1 < n && CARAKAN_TO_CONS.containsKey(input[i + 1])) {
+                val nextCons = CARAKAN_TO_CONS[input[i + 1]]!!
+                i += 2
+                var v = "é"
+                if (i < n && input[i] == CH_TARUNG) {
+                    v = "o"
+                    i++
+                }
+                var coda = ""
+                if (i < n) {
+                    when (input[i]) {
+                        CH_CECak -> { coda = "ng"; i++ }
+                        CH_LAYAR -> { coda = "r"; i++ }
+                        CH_WIGNYAN -> { coda = "h"; i++ }
+                    }
+                }
+                sb.append(if (nextCons == "h") "" else nextCons)
+                sb.append(v)
+                sb.append(coda)
+                continue
+            }
+
             val cons = CARAKAN_TO_CONS[ch]
             if (cons != null) {
                 i++
                 var cluster = ""
                 var vowel = "a"
+                var coda = ""
                 var hasCecakTelu = false
                 var killed = false
 
@@ -159,6 +184,9 @@ object JavaneseScript {
                         CH_TARUNG -> { vowel = "o"; i++ }
                         '\uA9BB' -> { vowel = "o"; i++ }
                         CH_PEPET -> { vowel = "e"; i++ }
+                        CH_CECak -> { coda = "ng"; i++ }
+                        CH_LAYAR -> { coda = "r"; i++ }
+                        CH_WIGNYAN -> { coda = "h"; i++ }
                         CH_PANGKON -> { killed = true; i++; break }
                         else -> break
                     }
@@ -168,6 +196,7 @@ object JavaneseScript {
                 sb.append(mappedCons)
                 sb.append(cluster)
                 if (!killed) sb.append(vowel)
+                sb.append(coda)
                 continue
             }
 

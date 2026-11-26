@@ -2,6 +2,7 @@ package com.clestial.keyboard.math
 
 import android.os.Handler
 import android.os.Looper
+import com.clestial.keyboard.Prefs
 import org.json.JSONArray
 import org.json.JSONObject
 import java.io.BufferedReader
@@ -354,6 +355,229 @@ object AiRouterClient {
         }
     }
 
+    /** Tanya AI dengan preferensi pengguna (prioritas: ChatGPT akun/key, fallback: 9router). */
+    fun askQuestion(prefs: Prefs, question: String, onDone: (TextAiResult) -> Unit) {
+        val apiKey = prefs.chatGptApiKey.trim()
+        if (apiKey.isNotEmpty()) {
+            askChatGPT(apiKey, prefs.chatGptEndpoint, prefs.chatGptModel, question, onDone)
+        } else {
+            val base = sanitizeProxyUrl(prefs.aiProxyUrl)
+            if (base != null && !base.contains("10.0.2.2")) {
+                askQuestion(base, question, onDone)
+            } else {
+                onDone(TextAiResult(false, error = "Kunci API ChatGPT belum diisi. Masukkan OpenAI API Key (sk-...) melalui tombol Akun/Key di atas."))
+            }
+        }
+    }
+
+    /** Tafsir soal cerita dengan preferensi pengguna (prioritas: ChatGPT akun/key, fallback: 9router). */
+    fun parseStoryProblem(prefs: Prefs, storyText: String, onDone: (ParsedMathIntent) -> Unit) {
+        val apiKey = prefs.chatGptApiKey.trim()
+        if (apiKey.isNotEmpty()) {
+            parseStoryProblemChatGPT(apiKey, prefs.chatGptEndpoint, prefs.chatGptModel, storyText, onDone)
+        } else {
+            val base = sanitizeProxyUrl(prefs.aiProxyUrl)
+            if (base != null && !base.contains("10.0.2.2")) {
+                parseStoryProblem(base, storyText, onDone)
+            } else {
+                onDone(ParsedMathIntent(false, error = "Kunci API ChatGPT belum diisi. Masukkan OpenAI API Key (sk-...) melalui tombol Akun/Key."))
+            }
+        }
+    }
+
+    /** Penjelasan langkah dengan preferensi pengguna (prioritas: ChatGPT akun/key, fallback: 9router). */
+    fun explainSolution(
+        prefs: Prefs,
+        moduleId: String,
+        storyText: String,
+        solveResult: SolveResult,
+        onDone: (TextAiResult) -> Unit
+    ) {
+        val apiKey = prefs.chatGptApiKey.trim()
+        if (apiKey.isNotEmpty()) {
+            explainSolutionChatGPT(apiKey, prefs.chatGptEndpoint, prefs.chatGptModel, moduleId, storyText, solveResult, onDone)
+        } else {
+            val base = sanitizeProxyUrl(prefs.aiProxyUrl)
+            if (base != null && !base.contains("10.0.2.2")) {
+                explainSolution(base, moduleId, storyText, solveResult, onDone)
+            } else {
+                onDone(TextAiResult(false, error = "Kunci API ChatGPT belum diisi."))
+            }
+        }
+    }
+
+    /** Tanya langsung ke ChatGPT API (kompatibel OpenAI / browser-extension style). */
+    fun askChatGPT(
+        apiKey: String,
+        endpoint: String = Prefs.DEFAULT_CHATGPT_ENDPOINT,
+        model: String = Prefs.DEFAULT_CHATGPT_MODEL,
+        question: String,
+        onDone: (TextAiResult) -> Unit
+    ) {
+        val clean = question.trim()
+        if (clean.isEmpty()) {
+            onDone(TextAiResult(false, error = "Ketik pertanyaan terlebih dahulu."))
+            return
+        }
+        val cleanKey = apiKey.trim()
+        if (cleanKey.isEmpty()) {
+            onDone(TextAiResult(false, error = "Kunci API ChatGPT belum diisi. Masukkan OpenAI API Key (sk-...) di tombol Key/Akun."))
+            return
+        }
+        if (!acquireRateSlot()) {
+            onDone(TextAiResult(false, error = "Batas permintaan tercapai. Tunggu sebentar."))
+            return
+        }
+
+        executor.execute {
+            val reqJson = JSONObject().apply {
+                put("model", model.ifEmpty { Prefs.DEFAULT_CHATGPT_MODEL })
+                val messages = JSONArray().apply {
+                    put(JSONObject().apply {
+                        put("role", "system")
+                        put("content", "Kamu adalah asisten AI di ClestialKeyboard untuk membantu siswa SMP belajar matematika dan tugas sekolah. Berikan jawaban yang ramah, ringkas, jelas, dan akurat dalam Bahasa Indonesia.")
+                    })
+                    put(JSONObject().apply {
+                        put("role", "user")
+                        put("content", clean.take(2000))
+                    })
+                }
+                put("messages", messages)
+                put("temperature", 0.6)
+            }.toString()
+
+            val ep = if (endpoint.isNotBlank()) endpoint.trim() else Prefs.DEFAULT_CHATGPT_ENDPOINT
+            val res = postChatGpt(ep, cleanKey, reqJson)
+            mainHandler.post { onDone(res) }
+        }
+    }
+
+    /** Tafsir soal cerita langsung via ChatGPT API. */
+    fun parseStoryProblemChatGPT(
+        apiKey: String,
+        endpoint: String = Prefs.DEFAULT_CHATGPT_ENDPOINT,
+        model: String = Prefs.DEFAULT_CHATGPT_MODEL,
+        storyText: String,
+        onDone: (ParsedMathIntent) -> Unit
+    ) {
+        val clean = storyText.trim()
+        if (clean.isEmpty()) {
+            onDone(ParsedMathIntent(false, error = "Masukkan soal cerita terlebih dahulu."))
+            return
+        }
+        val cleanKey = apiKey.trim()
+        if (cleanKey.isEmpty()) {
+            onDone(ParsedMathIntent(false, error = "Kunci API ChatGPT belum diisi. Masukkan OpenAI API Key (sk-...) di tombol Key/Akun."))
+            return
+        }
+        if (!acquireRateSlot()) {
+            onDone(ParsedMathIntent(false, error = "Batas permintaan tercapai. Tunggu sebentar."))
+            return
+        }
+
+        executor.execute {
+            val systemPrompt = """
+Anda adalah parser soal matematika SMP kelas 9. Terjemahkan soal cerita berikut ke JSON valid untuk solver modul.
+Format jawaban HARUS persis JSON murni:
+{"modul": "<id_modul>", "input": {"<field>": "<value>"}}
+
+Daftar modul:
+- spldv (input: a1, b1, c1, a2, b2, c2)
+- power_root (input: sub, a, m, n, x)
+- quadratic_eq (input: a, b, c)
+- quadratic_func (input: a, b, c, x)
+- geom_trans (input: trans_type, sub, points, k, deg)
+- congruence_sim (input: sub, s1, s2, s3, s4)
+- curved_solid (input: solid, r, t, s, pi_mode)
+- statistics (input: data)
+- probability (input: jenis, n, target)
+- linear_line (input: sub, x1, y1, x2, y2, a, b, c, m, k, p, q, fp, fq)
+- plsv (input: expr)
+
+Hanya kembalikan JSON tanpa penjelasan tambahan dan tanpa markdown fence.
+""".trimIndent()
+
+            val reqJson = JSONObject().apply {
+                put("model", model.ifEmpty { Prefs.DEFAULT_CHATGPT_MODEL })
+                val messages = JSONArray().apply {
+                    put(JSONObject().apply {
+                        put("role", "system")
+                        put("content", systemPrompt)
+                    })
+                    put(JSONObject().apply {
+                        put("role", "user")
+                        put("content", clean.take(2000))
+                    })
+                }
+                put("messages", messages)
+                put("temperature", 0.1)
+            }.toString()
+
+            val ep = if (endpoint.isNotBlank()) endpoint.trim() else Prefs.DEFAULT_CHATGPT_ENDPOINT
+            val net = postChatGpt(ep, cleanKey, reqJson)
+            val result = if (!net.ok) {
+                ParsedMathIntent(false, error = net.error)
+            } else {
+                val validated = validateAiModuleJson(net.text)
+                validated.copy(model = net.model)
+            }
+            mainHandler.post { onDone(result) }
+        }
+    }
+
+    /** Penjelasan langkah penyelesaian soal via ChatGPT API. */
+    fun explainSolutionChatGPT(
+        apiKey: String,
+        endpoint: String = Prefs.DEFAULT_CHATGPT_ENDPOINT,
+        model: String = Prefs.DEFAULT_CHATGPT_MODEL,
+        moduleId: String,
+        storyText: String,
+        solveResult: SolveResult,
+        onDone: (TextAiResult) -> Unit
+    ) {
+        val cleanKey = apiKey.trim()
+        if (cleanKey.isEmpty()) {
+            onDone(TextAiResult(false, error = "Kunci API ChatGPT belum diisi."))
+            return
+        }
+        if (!acquireRateSlot()) {
+            onDone(TextAiResult(false, error = "Batas permintaan tercapai."))
+            return
+        }
+
+        executor.execute {
+            val prompt = """
+Jelaskan langkah penyelesaian matematika berikut dengan gaya ramah dan mudah dipahami siswa SMP:
+Modul: $moduleId
+Soal: $storyText
+Jawaban: ${solveResult.answer}
+Langkah:
+${solveResult.steps.joinToString("\n") { "- $it" }}
+Cek: ${solveResult.check}
+""".trimIndent()
+
+            val reqJson = JSONObject().apply {
+                put("model", model.ifEmpty { Prefs.DEFAULT_CHATGPT_MODEL })
+                val messages = JSONArray().apply {
+                    put(JSONObject().apply {
+                        put("role", "system")
+                        put("content", "Kamu adalah guru matematika SMP yang ramah, menjelaskan langkah soal secara bertahap dan mudah dipahami.")
+                    })
+                    put(JSONObject().apply {
+                        put("role", "user")
+                        put("content", prompt)
+                    })
+                }
+                put("messages", messages)
+                put("temperature", 0.5)
+            }.toString()
+
+            val ep = if (endpoint.isNotBlank()) endpoint.trim() else Prefs.DEFAULT_CHATGPT_ENDPOINT
+            val res = postChatGpt(ep, cleanKey, reqJson)
+            mainHandler.post { onDone(res) }
+        }
+    }
+
     /** Tanya AI umum dari keyboard / layar belajar melalui proxy 9router. */
     fun askQuestion(proxyBaseUrl: String, question: String, onDone: (TextAiResult) -> Unit) {
         val clean = question.trim()
@@ -434,6 +658,64 @@ object AiRouterClient {
                 }
             } catch (e: Exception) {
                 lastError = "Proxy AI tidak aktif atau timeout. Kalkulator manual tetap berjalan penuh."
+            } finally {
+                conn?.disconnect()
+            }
+        }
+        return TextAiResult(ok = false, error = lastError)
+    }
+
+    private fun postChatGpt(endpoint: String, apiKey: String, jsonBody: String): TextAiResult {
+        var lastError = "Gagal menghubungi layanan ChatGPT. Periksa koneksi internet Anda."
+        for (attempt in 0..MAX_RETRIES) {
+            var conn: HttpURLConnection? = null
+            try {
+                conn = (URL(endpoint).openConnection() as HttpURLConnection).apply {
+                    requestMethod = "POST"
+                    connectTimeout = CONNECT_TIMEOUT_MS
+                    readTimeout = READ_TIMEOUT_MS
+                    doOutput = true
+                    setRequestProperty("Content-Type", "application/json; charset=utf-8")
+                    setRequestProperty("Authorization", "Bearer $apiKey")
+                }
+                OutputStreamWriter(conn.outputStream, Charsets.UTF_8).use { it.write(jsonBody) }
+                val code = conn.responseCode
+                val stream = if (code in 200..299) conn.inputStream else conn.errorStream
+                val respText = stream?.let { BufferedReader(InputStreamReader(it, Charsets.UTF_8)).readText() } ?: ""
+                if (code in 200..299) {
+                    val reply = try {
+                        val root = JSONObject(respText)
+                        val choices = root.optJSONArray("choices")
+                        if (choices != null && choices.length() > 0) {
+                            choices.getJSONObject(0).optJSONObject("message")?.optString("content", "") ?: ""
+                        } else {
+                            ""
+                        }
+                    } catch (e: Exception) {
+                        ""
+                    }
+                    if (reply.isNotEmpty()) {
+                        return TextAiResult(ok = true, text = reply.trim(), model = extractModel(respText))
+                    }
+                    return TextAiResult(ok = false, error = "Respons ChatGPT kosong.")
+                }
+                val errMsg = try {
+                    val root = JSONObject(respText)
+                    val err = root.optJSONObject("error")
+                    err?.optString("message") ?: "Error $code dari ChatGPT."
+                } catch (e: Exception) {
+                    when (code) {
+                        401 -> "Kunci API ChatGPT tidak valid atau salah. Periksa kembali API Key Anda."
+                        429 -> "Batas kuota ChatGPT tercapai (Rate Limit / Quota Exceeded)."
+                        else -> "Server ChatGPT mengembalikan kode error $code."
+                    }
+                }
+                lastError = errMsg
+                if (code != 429 && code < 500) {
+                    return TextAiResult(ok = false, error = lastError)
+                }
+            } catch (e: Exception) {
+                lastError = "Koneksi ke ChatGPT gagal atau timeout. Periksa internet atau API Key."
             } finally {
                 conn?.disconnect()
             }

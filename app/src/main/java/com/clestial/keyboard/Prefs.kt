@@ -200,11 +200,32 @@ class Prefs(context: Context) {
         get() = readBool(KEY_TR_WIFI, true)
         set(value) = writeBool(KEY_TR_WIFI, value)
 
-    /** URL server proxy tipis 9router (tanpa menyimpan API key di perangkat). */
+    /** URL server proxy tipis 9router (opsional / fallback). */
     var aiProxyUrl: String
         get() = readString(KEY_AI_PROXY_URL, DEFAULT_AI_PROXY_URL)
         set(value) {
             sp.edit().putString(KEY_AI_PROXY_URL, value.trim().ifEmpty { DEFAULT_AI_PROXY_URL }).apply()
+        }
+
+    /** OpenAI / ChatGPT API Key (sk-...) langsung di perangkat seperti extension browser. */
+    var chatGptApiKey: String
+        get() = readString(KEY_CHATGPT_API_KEY, "")
+        set(value) {
+            sp.edit().putString(KEY_CHATGPT_API_KEY, value.trim()).apply()
+        }
+
+    /** Model ChatGPT yang dipilih (default: gpt-4o-mini). */
+    var chatGptModel: String
+        get() = readString(KEY_CHATGPT_MODEL, DEFAULT_CHATGPT_MODEL)
+        set(value) {
+            sp.edit().putString(KEY_CHATGPT_MODEL, value.trim().ifEmpty { DEFAULT_CHATGPT_MODEL }).apply()
+        }
+
+    /** Endpoint API Chat Completions (default: https://api.openai.com/v1/chat/completions). */
+    var chatGptEndpoint: String
+        get() = readString(KEY_CHATGPT_ENDPOINT, DEFAULT_CHATGPT_ENDPOINT)
+        set(value) {
+            sp.edit().putString(KEY_CHATGPT_ENDPOINT, value.trim().ifEmpty { DEFAULT_CHATGPT_ENDPOINT }).apply()
         }
 
     /** Tombol kontrol kursor di bilah Tools (panah, pilih, salin, tempel, potong). */
@@ -449,6 +470,11 @@ class Prefs(context: Context) {
         private const val KEY_SUGGESTION_BAR = "suggestion_bar"
         private const val KEY_AI_PROXY_URL = "ai_proxy_url"
         const val DEFAULT_AI_PROXY_URL = "http://10.0.2.2:8787"
+        private const val KEY_CHATGPT_API_KEY = "chatgpt_api_key"
+        private const val KEY_CHATGPT_MODEL = "chatgpt_model"
+        private const val KEY_CHATGPT_ENDPOINT = "chatgpt_endpoint"
+        const val DEFAULT_CHATGPT_MODEL = "gpt-4o-mini"
+        const val DEFAULT_CHATGPT_ENDPOINT = "https://api.openai.com/v1/chat/completions"
 
         /** Semua kunci pengaturan mengetik (semua kecuali tema). */
         private val TYPING_KEYS = listOf(

@@ -129,7 +129,7 @@ class MathModulesActivity : AppCompatActivity() {
             tvStoryStatus.text = getString(R.string.ai_busy)
             storyConfirmBox.visibility = View.GONE
             btnParseStory.isEnabled = false
-            AiRouterClient.parseStoryProblem(prefs.aiProxyUrl, story) { parsed ->
+            AiRouterClient.parseStoryProblem(prefs, story) { parsed ->
                 btnParseStory.isEnabled = true
                 if (!parsed.ok || parsed.module == null) {
                     tvStoryStatus.text = parsed.error
@@ -165,7 +165,7 @@ class MathModulesActivity : AppCompatActivity() {
             tvAiExplain.text = getString(R.string.ai_busy)
             btnExplainAi.isEnabled = false
             AiRouterClient.explainSolution(
-                prefs.aiProxyUrl,
+                prefs,
                 activeModule.id,
                 etStory.text.toString(),
                 res
