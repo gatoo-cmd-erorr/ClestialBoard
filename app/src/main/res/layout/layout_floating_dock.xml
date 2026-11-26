@@ -1,0 +1,99 @@
+<?xml version="1.0" encoding="utf-8"?>
+<LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
+    android:id="@+id/rootFloatingDock"
+    android:layout_width="wrap_content"
+    android:layout_height="wrap_content"
+    android:gravity="center_vertical"
+    android:orientation="horizontal"
+    android:paddingStart="4dp"
+    android:paddingEnd="12dp">
+
+    <!-- Handle Geser Tepi (Pegangan samping mirip foto TikTok) -->
+    <View
+        android:id="@+id/dockDragHandle"
+        android:layout_width="6dp"
+        android:layout_height="72dp"
+        android:layout_marginEnd="6dp"
+        android:background="@drawable/bg_floating_bubble" />
+
+    <!-- Bilah Vertikal Menu Melayang (Foto 1) -->
+    <LinearLayout
+        android:id="@+id/dockBar"
+        android:layout_width="52dp"
+        android:layout_height="wrap_content"
+        android:background="@drawable/bg_floating_dock"
+        android:elevation="6dp"
+        android:gravity="center_horizontal"
+        android:orientation="vertical"
+        android:paddingTop="8dp"
+        android:paddingBottom="8dp">
+
+        <!-- 1. 🔍 Kotak Seleksi Soal (Circle to Search / Crop Real-time) -->
+        <ImageButton
+            android:id="@+id/btnDockCrop"
+            android:layout_width="44dp"
+            android:layout_height="44dp"
+            android:background="?attr/selectableItemBackgroundBorderless"
+            android:contentDescription="Kotak Seleksi Soal (Circle Search)"
+            android:padding="10dp"
+            android:scaleType="fitCenter"
+            android:src="@drawable/ic_kb_search" />
+
+        <!-- 2. ✨ Tanya AI (ChatGPT) -->
+        <ImageButton
+            android:id="@+id/btnDockAi"
+            android:layout_width="44dp"
+            android:layout_height="44dp"
+            android:layout_marginTop="4dp"
+            android:background="?attr/selectableItemBackgroundBorderless"
+            android:contentDescription="Tanya AI (ChatGPT)"
+            android:padding="10dp"
+            android:scaleType="fitCenter"
+            android:src="@drawable/ic_kb_ai" />
+
+        <!-- 3. 🌐 Google Web Melayang -->
+        <ImageButton
+            android:id="@+id/btnDockWeb"
+            android:layout_width="44dp"
+            android:layout_height="44dp"
+            android:layout_marginTop="4dp"
+            android:background="?attr/selectableItemBackgroundBorderless"
+            android:contentDescription="Google Web Melayang"
+            android:padding="10dp"
+            android:scaleType="fitCenter"
+            android:src="@drawable/ic_kb_translate" />
+
+        <!-- 4. ∑ Matematika SMP 9 (11 Modul Eksak) -->
+        <ImageButton
+            android:id="@+id/btnDockMath"
+            android:layout_width="44dp"
+            android:layout_height="44dp"
+            android:layout_marginTop="4dp"
+            android:background="?attr/selectableItemBackgroundBorderless"
+            android:contentDescription="Kalkulator Matematika SMP 9"
+            android:padding="10dp"
+            android:scaleType="fitCenter"
+            android:src="@drawable/ic_kb_math" />
+
+        <!-- Pemisah tipis -->
+        <View
+            android:layout_width="28dp"
+            android:layout_height="1dp"
+            android:layout_marginTop="6dp"
+            android:layout_marginBottom="6dp"
+            android:background="#2E303A" />
+
+        <!-- 5. ✕ Sembunyikan Menu (Kembali ke mode tersamar) -->
+        <ImageButton
+            android:id="@+id/btnDockHide"
+            android:layout_width="44dp"
+            android:layout_height="44dp"
+            android:background="?attr/selectableItemBackgroundBorderless"
+            android:contentDescription="Sembunyikan Menu"
+            android:padding="11dp"
+            android:scaleType="fitCenter"
+            android:src="@drawable/ic_kb_close" />
+
+    </LinearLayout>
+
+</LinearLayout>

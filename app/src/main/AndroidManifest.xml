@@ -3,6 +3,7 @@
 
     <uses-permission android:name="android.permission.VIBRATE" />
     <uses-permission android:name="android.permission.SYSTEM_ALERT_WINDOW" />
+    <uses-permission android:name="android.permission.FOREGROUND_SERVICE" />
 
     <!-- Hanya untuk mengunduh data bahasa terjemahan. Teks yang diketik tidak pernah dikirim ke mana pun. -->
     <uses-permission android:name="android.permission.INTERNET" />
@@ -60,6 +61,13 @@
         <!-- Layar tanpa tampilan untuk meminta izin akses foto dari keyboard -->
         <activity
             android:name=".ScreenshotAccessActivity"
+            android:excludeFromRecents="true"
+            android:exported="false"
+            android:taskAffinity=""
+            android:theme="@android:style/Theme.Translucent.NoTitleBar" />
+
+        <activity
+            android:name=".floating.ScreenCaptureActivity"
             android:excludeFromRecents="true"
             android:exported="false"
             android:taskAffinity=""

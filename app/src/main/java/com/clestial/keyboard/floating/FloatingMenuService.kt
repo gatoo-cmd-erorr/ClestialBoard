@@ -25,7 +25,9 @@ import android.webkit.WebView
 import android.webkit.WebViewClient
 import android.widget.Button
 import android.widget.EditText
+import android.widget.FrameLayout
 import android.widget.ImageButton
+import android.widget.ImageView
 import android.widget.LinearLayout
 import android.widget.TextView
 import android.widget.Toast
@@ -45,12 +47,30 @@ class FloatingMenuService : Service() {
     private lateinit var prefs: Prefs
     private val mainHandler = Handler(Looper.getMainLooper())
 
+    // 1. Stealth Bubble (Tombol Mengambang Tersamar di tepi layar)
     private var bubbleView: View? = null
     private var bubbleParams: WindowManager.LayoutParams? = null
 
+    // 2. Vertical Floating Dock (Bilah Vertikal Samping - Foto 1)
+    private var dockView: View? = null
+    private var dockParams: WindowManager.LayoutParams? = null
+    private var isDockShowing = false
+
+    // 3. Selection Box (Kotak Seleksi Bergaris Biru Neon - Foto 2)
+    private var selectionBoxView: View? = null
+    private var selectionBoxParams: WindowManager.LayoutParams? = null
+    private var isBoxShowing = false
+
+    // 4. Pop-up Window (Tanya AI, Google Web, SMP 9)
     private var popupView: View? = null
     private var popupParams: WindowManager.LayoutParams? = null
     private var isPopupShowing = false
+
+    // State Pop-up Views
+    private var etAiQuestionRef: EditText? = null
+    private var etGoogleSearchRef: EditText? = null
+    private var webViewRef: WebView? = null
+    private var selectTabRef: ((Int) -> Unit)? = null
 
     // State Math di Pop-up
     private var activeMathModule: MathModule = MathRegistry.modules.first()
@@ -64,18 +84,42 @@ class FloatingMenuService : Service() {
         prefs = Prefs(this)
 
         createBubbleView()
+        createDockView()
+        createSelectionBoxView()
         createPopupView()
     }
 
     override fun onStartCommand(intent: Intent?, flags: Int, startId: Int): Int {
         when (intent?.action) {
-            FloatingMenuManager.ACTION_SHOW_MENU -> showPopup()
+            FloatingMenuManager.ACTION_SHOW_MENU -> {
+                hideDock()
+                hideSelectionBox()
+                showPopup(0)
+            }
             FloatingMenuManager.ACTION_HIDE_MENU -> hidePopup()
             FloatingMenuManager.ACTION_TOGGLE_MENU -> {
-                if (isPopupShowing) hidePopup() else showPopup()
+                if (isPopupShowing) hidePopup() else showPopup(0)
+            }
+            FloatingMenuManager.ACTION_SHOW_DOCK -> {
+                hidePopup()
+                hideSelectionBox()
+                showDock()
+            }
+            FloatingMenuManager.ACTION_HIDE_DOCK -> hideDock()
+            FloatingMenuManager.ACTION_SHOW_BOX -> {
+                hideDock()
+                hidePopup()
+                showSelectionBox()
+            }
+            FloatingMenuManager.ACTION_HIDE_BOX -> hideSelectionBox()
+            FloatingMenuManager.ACTION_SEARCH_GOOGLE -> {
+                val query = intent.getStringExtra(FloatingMenuManager.EXTRA_QUERY).orEmpty()
+                hideDock()
+                hideSelectionBox()
+                showPopup(tabIndex = 1, initialQuery = query)
             }
             else -> {
-                if (!isPopupShowing && bubbleView == null) {
+                if (!isPopupShowing && !isDockShowing && !isBoxShowing && bubbleView == null) {
                     showBubble()
                 }
             }
@@ -111,7 +155,7 @@ class FloatingMenuService : Service() {
             PixelFormat.TRANSLUCENT
         ).apply {
             gravity = Gravity.TOP or Gravity.START
-            x = 24
+            x = 16
             y = resources.displayMetrics.heightPixels / 3
         }
 
@@ -120,7 +164,6 @@ class FloatingMenuService : Service() {
         var initialY = 0
         var initialTouchX = 0f
         var initialTouchY = 0f
-        var lastTapTime = 0L
 
         bubble.setOnTouchListener { _, event ->
             when (event.action) {
@@ -143,13 +186,11 @@ class FloatingMenuService : Service() {
                     val diffX = abs(event.rawX - initialTouchX)
                     val diffY = abs(event.rawY - initialTouchY)
                     if (diffX < touchSlop && diffY < touchSlop) {
-                        val now = System.currentTimeMillis()
-                        if (now - lastTapTime < 380) {
-                            // Ketuk 2x: Buka Pop-up Menu!
-                            showPopup()
-                            lastTapTime = 0L
+                        // Sentuh gelembung untuk membuka / menutup Dock menu melayang
+                        if (isDockShowing) {
+                            hideDock()
                         } else {
-                            lastTapTime = now
+                            showDock()
                         }
                     }
                     true
@@ -160,27 +201,290 @@ class FloatingMenuService : Service() {
 
         bubbleView = bubble
         bubbleParams = params
-        showBubble()
     }
 
     private fun showBubble() {
-        val b = bubbleView ?: return
+        if (bubbleView == null) createBubbleView()
+        val v = bubbleView ?: return
         val p = bubbleParams ?: return
-        if (!b.isAttachedToWindow) {
+        if (!v.isAttachedToWindow) {
             try {
-                wm.addView(b, p)
+                wm.addView(v, p)
             } catch (e: Exception) {
-                // Ignore
+                e.printStackTrace()
             }
         }
-        b.visibility = View.VISIBLE
+        v.visibility = View.VISIBLE
     }
 
     private fun hideBubble() {
         bubbleView?.visibility = View.GONE
     }
 
-    // ------------------------------------------------------------- 2. Pop-up Window
+    // ------------------------------------------------------------- 2. Vertical Floating Dock (Foto 1)
+    @SuppressLint("ClickableViewAccessibility")
+    private fun createDockView() {
+        if (!FloatingMenuManager.canDrawOverlays(this)) return
+
+        val inflater = LayoutInflater.from(this)
+        val dockRoot = inflater.inflate(R.layout.layout_floating_dock, null)
+
+        val overlayType = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
+            WindowManager.LayoutParams.TYPE_APPLICATION_OVERLAY
+        } else {
+            @Suppress("DEPRECATION")
+            WindowManager.LayoutParams.TYPE_PHONE
+        }
+
+        val params = WindowManager.LayoutParams(
+            WindowManager.LayoutParams.WRAP_CONTENT,
+            WindowManager.LayoutParams.WRAP_CONTENT,
+            overlayType,
+            WindowManager.LayoutParams.FLAG_NOT_TOUCH_MODAL or
+                    WindowManager.LayoutParams.FLAG_LAYOUT_NO_LIMITS,
+            PixelFormat.TRANSLUCENT
+        ).apply {
+            gravity = Gravity.TOP or Gravity.START
+            x = 0
+            y = resources.displayMetrics.heightPixels / 3 - dp(40f)
+        }
+
+        val dragHandle = dockRoot.findViewById<View>(R.id.dockDragHandle)
+        var initialY = 0
+        var touchStartY = 0f
+
+        dragHandle.setOnTouchListener { _, event ->
+            when (event.action) {
+                MotionEvent.ACTION_DOWN -> {
+                    initialY = params.y
+                    touchStartY = event.rawY
+                    true
+                }
+                MotionEvent.ACTION_MOVE -> {
+                    params.y = (initialY + (event.rawY - touchStartY)).toInt()
+                    if (dockView?.isAttachedToWindow == true) {
+                        wm.updateViewLayout(dockView, params)
+                    }
+                    true
+                }
+                else -> false
+            }
+        }
+
+        // 1. 🔍 Kotak Seleksi Soal (Circle to Search / Crop Real-time)
+        dockRoot.findViewById<View>(R.id.btnDockCrop).setOnClickListener {
+            hideDock()
+            showSelectionBox()
+        }
+
+        // 2. ✨ Tanya AI
+        dockRoot.findViewById<View>(R.id.btnDockAi).setOnClickListener {
+            hideDock()
+            showPopup(0)
+        }
+
+        // 3. 🌐 Google Web Melayang
+        dockRoot.findViewById<View>(R.id.btnDockWeb).setOnClickListener {
+            hideDock()
+            showPopup(1)
+        }
+
+        // 4. ∑ Matematika SMP 9
+        dockRoot.findViewById<View>(R.id.btnDockMath).setOnClickListener {
+            hideDock()
+            showPopup(2)
+        }
+
+        // 5. ✕ Tutup Dock (Kembali ke mode tersamar)
+        dockRoot.findViewById<View>(R.id.btnDockHide).setOnClickListener {
+            hideDock()
+            showBubble()
+        }
+
+        dockView = dockRoot
+        dockParams = params
+    }
+
+    private fun showDock() {
+        if (dockView == null) createDockView()
+        val v = dockView ?: return
+        val p = dockParams ?: return
+
+        // Posisikan dock vertikal sejajar dengan posisi y bubble
+        bubbleParams?.let { bp ->
+            p.y = bp.y - dp(30f)
+        }
+
+        if (!v.isAttachedToWindow) {
+            try {
+                wm.addView(v, p)
+            } catch (e: Exception) {
+                e.printStackTrace()
+            }
+        }
+        v.visibility = View.VISIBLE
+        isDockShowing = true
+        hideBubble()
+    }
+
+    private fun hideDock() {
+        dockView?.visibility = View.GONE
+        isDockShowing = false
+    }
+
+    // ------------------------------------------------------------- 3. Selection Box (Foto 2)
+    @SuppressLint("ClickableViewAccessibility")
+    private fun createSelectionBoxView() {
+        if (!FloatingMenuManager.canDrawOverlays(this)) return
+
+        val inflater = LayoutInflater.from(this)
+        val boxRoot = inflater.inflate(R.layout.layout_selection_box, null)
+
+        val overlayType = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
+            WindowManager.LayoutParams.TYPE_APPLICATION_OVERLAY
+        } else {
+            @Suppress("DEPRECATION")
+            WindowManager.LayoutParams.TYPE_PHONE
+        }
+
+        val displayW = resources.displayMetrics.widthPixels
+        val defaultW = (displayW * 0.78f).toInt().coerceAtLeast(dp(220f))
+        val defaultH = dp(170f)
+
+        val params = WindowManager.LayoutParams(
+            WindowManager.LayoutParams.WRAP_CONTENT,
+            WindowManager.LayoutParams.WRAP_CONTENT,
+            overlayType,
+            WindowManager.LayoutParams.FLAG_NOT_TOUCH_MODAL or
+                    WindowManager.LayoutParams.FLAG_LAYOUT_NO_LIMITS,
+            PixelFormat.TRANSLUCENT
+        ).apply {
+            gravity = Gravity.TOP or Gravity.START
+            x = (displayW - defaultW) / 2
+            y = dp(180f)
+        }
+
+        val boxFrame = boxRoot.findViewById<FrameLayout>(R.id.boxFrame)
+        val ivResizeHandle = boxRoot.findViewById<ImageView>(R.id.ivResizeHandle)
+        val btnCropCancel = boxRoot.findViewById<ImageButton>(R.id.btnCropCancel)
+        val btnCropConfirm = boxRoot.findViewById<ImageButton>(R.id.btnCropConfirm)
+
+        val frameLp = boxFrame.layoutParams
+        frameLp.width = defaultW
+        frameLp.height = defaultH
+        boxFrame.layoutParams = frameLp
+
+        // Geser posisi kotak seleksi di layar
+        var dragStartX = 0
+        var dragStartY = 0
+        var touchStartX = 0f
+        var touchStartY = 0f
+
+        boxFrame.setOnTouchListener { _, event ->
+            when (event.action) {
+                MotionEvent.ACTION_DOWN -> {
+                    dragStartX = params.x
+                    dragStartY = params.y
+                    touchStartX = event.rawX
+                    touchStartY = event.rawY
+                    true
+                }
+                MotionEvent.ACTION_MOVE -> {
+                    params.x = (dragStartX + (event.rawX - touchStartX)).toInt()
+                    params.y = (dragStartY + (event.rawY - touchStartY)).toInt()
+                    if (selectionBoxView?.isAttachedToWindow == true) {
+                        wm.updateViewLayout(selectionBoxView, params)
+                    }
+                    true
+                }
+                else -> false
+            }
+        }
+
+        // Ubah ukuran (resize) kotak dari sudut kanan bawah
+        var initialBoxW = 0
+        var initialBoxH = 0
+        var resizeTouchX = 0f
+        var resizeTouchY = 0f
+
+        ivResizeHandle.setOnTouchListener { _, event ->
+            when (event.action) {
+                MotionEvent.ACTION_DOWN -> {
+                    initialBoxW = boxFrame.width
+                    initialBoxH = boxFrame.height
+                    resizeTouchX = event.rawX
+                    resizeTouchY = event.rawY
+                    true
+                }
+                MotionEvent.ACTION_MOVE -> {
+                    val deltaW = (event.rawX - resizeTouchX).toInt()
+                    val deltaH = (event.rawY - resizeTouchY).toInt()
+                    val newW = (initialBoxW + deltaW).coerceAtLeast(dp(150f))
+                    val newH = (initialBoxH + deltaH).coerceAtLeast(dp(80f))
+                    val lp = boxFrame.layoutParams
+                    lp.width = newW
+                    lp.height = newH
+                    boxFrame.layoutParams = lp
+                    true
+                }
+                else -> false
+            }
+        }
+
+        // Batal: tutup kotak seleksi, kembalikan gelembung tersamar
+        btnCropCancel.setOnClickListener {
+            hideSelectionBox()
+            showBubble()
+        }
+
+        // Selesai/Pindai: Ambil koordinat dan luncurkan OCR & pencarian real-time
+        btnCropConfirm.setOnClickListener {
+            val location = IntArray(2)
+            boxFrame.getLocationOnScreen(location)
+            val cropX = location[0]
+            val cropY = location[1]
+            val cropW = boxFrame.width
+            val cropH = boxFrame.height
+
+            hideSelectionBox()
+
+            val captureIntent = Intent(this, ScreenCaptureActivity::class.java).apply {
+                flags = Intent.FLAG_ACTIVITY_NEW_TASK
+                putExtra(ScreenCaptureActivity.EXTRA_CROP_X, cropX)
+                putExtra(ScreenCaptureActivity.EXTRA_CROP_Y, cropY)
+                putExtra(ScreenCaptureActivity.EXTRA_CROP_W, cropW)
+                putExtra(ScreenCaptureActivity.EXTRA_CROP_H, cropH)
+            }
+            startActivity(captureIntent)
+        }
+
+        selectionBoxView = boxRoot
+        selectionBoxParams = params
+    }
+
+    private fun showSelectionBox() {
+        if (selectionBoxView == null) createSelectionBoxView()
+        val v = selectionBoxView ?: return
+        val p = selectionBoxParams ?: return
+        if (!v.isAttachedToWindow) {
+            try {
+                wm.addView(v, p)
+            } catch (e: Exception) {
+                e.printStackTrace()
+            }
+        }
+        v.visibility = View.VISIBLE
+        isBoxShowing = true
+        hideBubble()
+        hideDock()
+    }
+
+    private fun hideSelectionBox() {
+        selectionBoxView?.visibility = View.GONE
+        isBoxShowing = false
+    }
+
+    // ------------------------------------------------------------- 4. Pop-up Window
     @SuppressLint("ClickableViewAccessibility", "SetJavaScriptEnabled")
     private fun createPopupView() {
         if (!FloatingMenuManager.canDrawOverlays(this)) return
@@ -242,7 +546,6 @@ class FloatingMenuService : Service() {
                     if (diffX < touchSlop && diffY < touchSlop) {
                         val now = System.currentTimeMillis()
                         if (now - lastHeaderTap < 380) {
-                            // Ketuk 2x pada header: Tutup Menu!
                             hidePopup()
                             lastHeaderTap = 0L
                         } else {
@@ -275,6 +578,7 @@ class FloatingMenuService : Service() {
             panelGoogle.visibility = if (idx == 1) View.VISIBLE else View.GONE
             panelMath.visibility = if (idx == 2) View.VISIBLE else View.GONE
         }
+        selectTabRef = ::selectTab
 
         tabAi.setOnClickListener { selectTab(0) }
         tabGoogle.setOnClickListener { selectTab(1) }
@@ -288,6 +592,7 @@ class FloatingMenuService : Service() {
         val btnAiClear = popup.findViewById<Button>(R.id.btnAiClear)
         val btnAiSubmit = popup.findViewById<Button>(R.id.btnAiSubmit)
         val btnAiCopy = popup.findViewById<Button>(R.id.btnAiCopy)
+        etAiQuestionRef = etAi
 
         val cm = getSystemService(Context.CLIPBOARD_SERVICE) as ClipboardManager
 
@@ -303,25 +608,25 @@ class FloatingMenuService : Service() {
 
         btnAiClear.setOnClickListener {
             etAi.setText("")
-            tvAiResponse.text = "Hasil jawaban AI akan muncul di sini…"
+            tvAiResponse.text = "Hasil jawaban AI akan muncul di sini..."
         }
 
         btnAiSubmit.setOnClickListener {
             val q = etAi.text.toString().trim()
             if (q.isEmpty()) {
-                Toast.makeText(this, "Ketik pertanyaan terlebih dahulu", Toast.LENGTH_SHORT).show()
+                Toast.makeText(this, "Tulis atau tempel pertanyaan terlebih dahulu", Toast.LENGTH_SHORT).show()
                 return@setOnClickListener
             }
-            tvAiResponse.text = "Sedang berpikir & merumuskan jawaban..."
+            tvAiResponse.text = "Sedang memproses dengan AI..."
             btnAiSubmit.isEnabled = false
 
-            AiRouterClient.askQuestion(prefs, q) { res ->
+            AiRouterClient.askQuestion(this, q) { res ->
                 mainHandler.post {
                     btnAiSubmit.isEnabled = true
                     if (res.ok) {
                         tvAiResponse.text = res.text
                     } else {
-                        tvAiResponse.text = "Error: ${res.error}"
+                        tvAiResponse.text = "Error: ${res.error ?: "Gagal memproses"}"
                     }
                 }
             }
@@ -329,183 +634,217 @@ class FloatingMenuService : Service() {
 
         btnAiCopy.setOnClickListener {
             val ans = tvAiResponse.text.toString().trim()
-            if (ans.isNotEmpty() && !ans.startsWith("Hasil jawaban") && !ans.startsWith("Sedang berpikir")) {
-                cm.setPrimaryClip(ClipData.newPlainText("AI Answer", ans))
-                Toast.makeText(this, "Jawaban disalin ke papan klip!", Toast.LENGTH_SHORT).show()
+            if (ans.isNotEmpty() && !ans.startsWith("Hasil jawaban AI") && !ans.startsWith("Sedang memproses")) {
+                cm.setPrimaryClip(ClipData.newPlainText("Jawaban AI", ans))
+                Toast.makeText(this, "Jawaban AI berhasil disalin!", Toast.LENGTH_SHORT).show()
+            } else {
+                Toast.makeText(this, "Belum ada jawaban yang dapat disalin", Toast.LENGTH_SHORT).show()
             }
         }
 
-        // --- Tab 2: Mini Google Search Webview
-        val etGoogle = popup.findViewById<EditText>(R.id.etGoogleQuery)
-        val btnSearch = popup.findViewById<Button>(R.id.btnGoogleSearch)
-        val wv = popup.findViewById<WebView>(R.id.wvGoogle)
-        val btnWebBack = popup.findViewById<Button>(R.id.btnWebBack)
-        val btnWebReload = popup.findViewById<Button>(R.id.btnWebReload)
-        val tvWebUrl = popup.findViewById<TextView>(R.id.tvWebUrl)
+        // --- Tab 2: Google Web Search
+        val etGoogleSearch = popup.findViewById<EditText>(R.id.etGoogleSearch)
+        val btnGoogleSubmit = popup.findViewById<Button>(R.id.btnGoogleSubmit)
+        val btnGoogleBack = popup.findViewById<ImageButton>(R.id.btnGoogleBack)
+        val btnGoogleReload = popup.findViewById<ImageButton>(R.id.btnGoogleReload)
+        val tvGoogleUrl = popup.findViewById<TextView>(R.id.tvGoogleUrl)
+        val webView = popup.findViewById<WebView>(R.id.webViewGoogle)
+        etGoogleSearchRef = etGoogleSearch
+        webViewRef = webView
 
-        wv.settings.apply {
-            javaScriptEnabled = true
-            domStorageEnabled = true
-            useWideViewPort = true
-            loadWithOverviewMode = true
-            cacheMode = WebSettings.LOAD_DEFAULT
+        setupWebView(webView, tvGoogleUrl)
+
+        fun performSearch(query: String) {
+            val trimmed = query.trim()
+            val targetUrl = if (trimmed.isEmpty()) {
+                "https://www.google.com"
+            } else if (trimmed.startsWith("http://") || trimmed.startsWith("https://")) {
+                trimmed
+            } else {
+                "https://www.google.com/search?q=" + URLEncoder.encode(trimmed, "UTF-8")
+            }
+            webView.loadUrl(targetUrl)
         }
-        wv.webViewClient = object : WebViewClient() {
-            override fun onPageFinished(view: WebView?, url: String?) {
-                super.onPageFinished(view, url)
-                tvWebUrl.text = url.orEmpty()
+
+        btnGoogleSubmit.setOnClickListener {
+            performSearch(etGoogleSearch.text.toString())
+        }
+
+        btnGoogleBack.setOnClickListener {
+            if (webView.canGoBack()) webView.goBack() else webView.loadUrl("https://www.google.com")
+        }
+
+        btnGoogleReload.setOnClickListener {
+            webView.reload()
+        }
+
+        // Muat Google halaman awal
+        webView.loadUrl("https://www.google.com")
+
+        // --- Tab 3: SMP 9 Math Modules
+        val mathChipContainer = popup.findViewById<LinearLayout>(R.id.mathChipContainer)
+        val tvMathDesc = popup.findViewById<TextView>(R.id.tvMathModuleDesc)
+        val containerMathInputs = popup.findViewById<LinearLayout>(R.id.containerMathInputs)
+        val tvMathResult = popup.findViewById<TextView>(R.id.tvMathResult)
+        val btnMathSolve = popup.findViewById<Button>(R.id.btnMathSolve)
+        val btnMathCopy = popup.findViewById<Button>(R.id.btnMathCopy)
+
+        fun buildMathModuleUI(mod: MathModule) {
+            activeMathModule = mod
+            tvMathDesc.text = mod.description
+            containerMathInputs.removeAllViews()
+            mathInputFields.clear()
+
+            for (field in mod.fields) {
+                val row = LinearLayout(this).apply {
+                    orientation = LinearLayout.HORIZONTAL
+                    gravity = Gravity.CENTER_VERTICAL
+                    layoutParams = LinearLayout.LayoutParams(
+                        LinearLayout.LayoutParams.MATCH_PARENT,
+                        LinearLayout.LayoutParams.WRAP_CONTENT
+                    ).apply { topMargin = dp(6f) }
+                }
+
+                val label = TextView(this).apply {
+                    text = "${field.label}:"
+                    setTextColor(Color.parseColor("#A0A5B5"))
+                    textSize = 12f
+                    layoutParams = LinearLayout.LayoutParams(0, LinearLayout.LayoutParams.WRAP_CONTENT, 1.2f)
+                }
+
+                val input = EditText(this).apply {
+                    setText(field.defaultValue)
+                    setTextColor(Color.WHITE)
+                    setBackgroundResource(R.drawable.bg_input)
+                    setPadding(dp(10f), dp(8f), dp(10f), dp(8f))
+                    textSize = 13f
+                    layoutParams = LinearLayout.LayoutParams(0, dp(40f), 1.8f)
+
+                    inputType = when (field.type) {
+                        FieldType.INTEGER -> android.text.InputType.TYPE_CLASS_NUMBER or android.text.InputType.TYPE_NUMBER_FLAG_SIGNED
+                        FieldType.DECIMAL -> android.text.InputType.TYPE_CLASS_NUMBER or android.text.InputType.TYPE_NUMBER_FLAG_DECIMAL or android.text.InputType.TYPE_NUMBER_FLAG_SIGNED
+                        FieldType.TEXT -> android.text.InputType.TYPE_CLASS_TEXT
+                        FieldType.SELECT -> android.text.InputType.TYPE_CLASS_TEXT
+                    }
+                }
+
+                row.addView(label)
+                row.addView(input)
+                containerMathInputs.addView(row)
+                mathInputFields[field.key] = input
             }
         }
-        wv.webChromeClient = WebChromeClient()
 
-        fun doGoogleSearch(query: String) {
-            val enc = try { URLEncoder.encode(query, "UTF-8") } catch (e: Exception) { query }
-            val target = "https://www.google.com/search?q=$enc"
-            wv.loadUrl(target)
+        // Buat chip untuk ke-11 modul
+        MathRegistry.modules.forEachIndexed { index, mod ->
+            val chip = Button(this).apply {
+                text = "${index + 1}. ${mod.shortName.uppercase()}"
+                textSize = 11f
+                setTextColor(if (index == 0) Color.WHITE else Color.parseColor("#8E92A0"))
+                setBackgroundResource(if (index == 0) R.drawable.bg_pill_on else R.drawable.bg_pill)
+                setPadding(dp(12f), dp(4f), dp(12f), dp(4f))
+                layoutParams = LinearLayout.LayoutParams(
+                    LinearLayout.LayoutParams.WRAP_CONTENT,
+                    dp(32f)
+                ).apply { marginEnd = dp(6f) }
+
+                setOnClickListener {
+                    for (i in 0 until mathChipContainer.childCount) {
+                        val c = mathChipContainer.getChildAt(i) as? Button ?: continue
+                        c.setBackgroundResource(if (i == index) R.drawable.bg_pill_on else R.drawable.bg_pill)
+                        c.setTextColor(if (i == index) Color.WHITE else Color.parseColor("#8E92A0"))
+                    }
+                    buildMathModuleUI(mod)
+                }
+            }
+            mathChipContainer.addView(chip)
         }
 
-        btnSearch.setOnClickListener {
-            val query = etGoogle.text.toString().trim()
-            if (query.isNotEmpty()) {
-                doGoogleSearch(query)
+        buildMathModuleUI(activeMathModule)
+
+        btnMathSolve.setOnClickListener {
+            val map = mutableMapOf<String, String>()
+            for ((k, et) in mathInputFields) {
+                map[k] = et.text.toString().trim()
+            }
+            val res = activeMathModule.solver(map)
+            val fullText = buildString {
+                append("Hasil: ").append(res.summary).append("\n\n")
+                if (res.steps.isNotEmpty()) {
+                    append("Langkah-langkah:\n")
+                    res.steps.forEachIndexed { i, s -> append("${i + 1}. $s\n") }
+                }
+                if (res.notes.isNotEmpty()) {
+                    append("\nCatatan: ").append(res.notes)
+                }
+            }
+            tvMathResult.text = fullText
+        }
+
+        btnMathCopy.setOnClickListener {
+            val textToCopy = tvMathResult.text.toString().trim()
+            if (textToCopy.isNotEmpty() && !textToCopy.startsWith("Jawaban dan langkah")) {
+                cm.setPrimaryClip(ClipData.newPlainText("Solusi Matematika SMP 9", textToCopy))
+                Toast.makeText(this, "Solusi dan langkah berhasil disalin!", Toast.LENGTH_SHORT).show()
+            } else {
+                Toast.makeText(this, "Belum ada solusi untuk disalin", Toast.LENGTH_SHORT).show()
             }
         }
-
-        btnWebBack.setOnClickListener {
-            if (wv.canGoBack()) wv.goBack()
-        }
-        btnWebReload.setOnClickListener {
-            wv.reload()
-        }
-
-        // --- Tab 3: SMP 9 Math Quick Solver
-        setupMathTab(popup)
 
         popupView = popup
         popupParams = params
     }
 
-    private fun setupMathTab(popup: View) {
-        val chipsRow = popup.findViewById<LinearLayout>(R.id.mathChipsRow)
-        val descView = popup.findViewById<TextView>(R.id.tvFloatingMathDesc)
-        val fieldsContainer = popup.findViewById<LinearLayout>(R.id.mathFieldsContainer)
-        val btnSolve = popup.findViewById<Button>(R.id.btnFloatingMathSolve)
-        val tvResult = popup.findViewById<TextView>(R.id.tvFloatingMathResult)
-        val btnCopy = popup.findViewById<Button>(R.id.btnFloatingMathCopy)
+    @SuppressLint("SetJavaScriptEnabled")
+    private fun setupWebView(webView: WebView, tvUrl: TextView) {
+        val s = webView.settings
+        s.javaScriptEnabled = true
+        s.domStorageEnabled = true
+        s.databaseEnabled = true
+        s.cacheMode = WebSettings.LOAD_DEFAULT
+        s.builtInZoomControls = true
+        s.displayZoomControls = false
+        s.useWideViewPort = true
+        s.loadWithOverviewMode = true
 
-        chipsRow.removeAllViews()
-
-        fun renderFieldsForModule(m: MathModule) {
-            activeMathModule = m
-            descView.text = "${m.name}: ${m.description}"
-            fieldsContainer.removeAllViews()
-            mathInputFields.clear()
-
-            for (f in m.fields) {
-                val row = LinearLayout(this).apply {
-                    orientation = LinearLayout.HORIZONTAL
-                    layoutParams = LinearLayout.LayoutParams(
-                        LinearLayout.LayoutParams.MATCH_PARENT,
-                        dp(34f)
-                    ).apply { topMargin = dp(3f) }
-                    gravity = Gravity.CENTER_VERTICAL
-                }
-
-                val label = TextView(this).apply {
-                    text = "${f.label}:"
-                    setTextColor(Color.parseColor("#94A3B8"))
-                    textSize = 11f
-                    layoutParams = LinearLayout.LayoutParams(dp(110f), LinearLayout.LayoutParams.WRAP_CONTENT)
-                }
-
-                val input = EditText(this).apply {
-                    hint = f.defaultValue.ifEmpty { "0" }
-                    if (f.defaultValue.isNotEmpty()) setText(f.defaultValue)
-                    setBackgroundResource(R.drawable.bg_input)
-                    setTextColor(Color.WHITE)
-                    textSize = 12f
-                    setPadding(dp(8f), dp(2f), dp(8f), dp(2f))
-                    layoutParams = LinearLayout.LayoutParams(0, LinearLayout.LayoutParams.MATCH_PARENT, 1f)
-                    inputType = android.text.InputType.TYPE_CLASS_TEXT
-                }
-
-                row.addView(label)
-                row.addView(input)
-                fieldsContainer.addView(row)
-                mathInputFields[f.key] = input
+        webView.webViewClient = object : WebViewClient() {
+            override fun onPageFinished(view: WebView?, url: String?) {
+                super.onPageFinished(view, url)
+                tvUrl.text = url ?: "https://www.google.com"
             }
         }
-
-        MathRegistry.modules.forEachIndexed { idx, mod ->
-            val chip = Button(this, null, android.R.attr.borderlessButtonStyle).apply {
-                text = "${idx + 1}. ${mod.name.take(15)}"
-                setTextColor(Color.WHITE)
-                textSize = 10f
-                setBackgroundResource(if (idx == 0) R.drawable.bg_btn else R.drawable.bg_pill)
-                setPadding(dp(8f), 0, dp(8f), 0)
-                layoutParams = LinearLayout.LayoutParams(
-                    LinearLayout.LayoutParams.WRAP_CONTENT,
-                    LinearLayout.LayoutParams.MATCH_PARENT
-                ).apply { marginEnd = dp(4f) }
-                setOnClickListener {
-                    renderFieldsForModule(mod)
-                    // Update visual chips
-                    for (i in 0 until chipsRow.childCount) {
-                        chipsRow.getChildAt(i).setBackgroundResource(if (i == idx) R.drawable.bg_btn else R.drawable.bg_pill)
-                    }
-                }
-            }
-            chipsRow.addView(chip)
-        }
-
-        renderFieldsForModule(MathRegistry.modules.first())
-
-        btnSolve.setOnClickListener {
-            val inputs = HashMap<String, String>()
-            mathInputFields.forEach { (k, et) ->
-                inputs[k] = et.text.toString().trim()
-            }
-            val res = activeMathModule.solve(inputs)
-            if (res.ok) {
-                val full = buildString {
-                    appendLine("Materi: ${activeMathModule.name}")
-                    appendLine("Jawaban: ${res.answer}")
-                    appendLine("Langkah-langkah:")
-                    res.steps.forEachIndexed { i, s -> appendLine("${i + 1}. $s") }
-                    if (res.check.isNotEmpty()) appendLine("Cek: ${res.check}")
-                }
-                tvResult.text = full
-            } else {
-                tvResult.text = "Error: ${res.error}"
-            }
-        }
-
-        val cm = getSystemService(Context.CLIPBOARD_SERVICE) as ClipboardManager
-        btnCopy.setOnClickListener {
-            val text = tvResult.text.toString().trim()
-            if (text.isNotEmpty() && !text.startsWith("Jawaban dan langkah")) {
-                cm.setPrimaryClip(ClipData.newPlainText("Math Solution", text))
-                Toast.makeText(this, "Jawaban & langkah disalin!", Toast.LENGTH_SHORT).show()
-            }
-        }
+        webView.webChromeClient = WebChromeClient()
     }
 
-    private fun showPopup() {
-        val p = popupView ?: return
-        val params = popupParams ?: return
-        hideBubble()
-        if (!p.isAttachedToWindow) {
+    fun showPopup(tabIndex: Int = 0, initialQuery: String? = null) {
+        if (popupView == null) createPopupView()
+        val v = popupView ?: return
+        val p = popupParams ?: return
+
+        selectTabRef?.invoke(tabIndex)
+
+        if (!initialQuery.isNullOrEmpty()) {
+            etAiQuestionRef?.setText(initialQuery)
+            etGoogleSearchRef?.setText(initialQuery)
+            val searchUrl = "https://www.google.com/search?q=" + URLEncoder.encode(initialQuery, "UTF-8")
+            webViewRef?.loadUrl(searchUrl)
+        }
+
+        if (!v.isAttachedToWindow) {
             try {
-                wm.addView(p, params)
+                wm.addView(v, p)
             } catch (e: Exception) {
-                // Ignore
+                e.printStackTrace()
             }
         }
-        p.visibility = View.VISIBLE
+        v.visibility = View.VISIBLE
         isPopupShowing = true
+        hideBubble()
+        hideDock()
+        hideSelectionBox()
     }
 
-    private fun hidePopup() {
+    fun hidePopup() {
         popupView?.visibility = View.GONE
         isPopupShowing = false
         showBubble()
@@ -513,11 +852,9 @@ class FloatingMenuService : Service() {
 
     override fun onDestroy() {
         super.onDestroy()
-        try {
-            bubbleView?.let { if (it.isAttachedToWindow) wm.removeView(it) }
-            popupView?.let { if (it.isAttachedToWindow) wm.removeView(it) }
-        } catch (e: Exception) {
-            // Ignore
-        }
+        bubbleView?.let { if (it.isAttachedToWindow) wm.removeView(it) }
+        dockView?.let { if (it.isAttachedToWindow) wm.removeView(it) }
+        selectionBoxView?.let { if (it.isAttachedToWindow) wm.removeView(it) }
+        popupView?.let { if (it.isAttachedToWindow) wm.removeView(it) }
     }
 }
