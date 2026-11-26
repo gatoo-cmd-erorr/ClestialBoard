@@ -649,8 +649,8 @@ class FloatingMenuService : Service() {
         // --- Tab 2: Google Web Search
         val etGoogleSearch = popup.findViewById<EditText>(R.id.etGoogleQuery)
         val btnGoogleSubmit = popup.findViewById<Button>(R.id.btnGoogleSearch)
-        val btnGoogleBack = popup.findViewById<ImageButton>(R.id.btnWebBack)
-        val btnGoogleReload = popup.findViewById<ImageButton>(R.id.btnWebReload)
+        val btnGoogleBack = popup.findViewById<Button>(R.id.btnWebBack)
+        val btnGoogleReload = popup.findViewById<Button>(R.id.btnWebReload)
         val tvGoogleUrl = popup.findViewById<TextView>(R.id.tvWebUrl)
         val webView = popup.findViewById<WebView>(R.id.wvGoogle)
         etGoogleSearchRef = etGoogleSearch
