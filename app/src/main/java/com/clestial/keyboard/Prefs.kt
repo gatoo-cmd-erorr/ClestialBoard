@@ -228,6 +228,26 @@ class Prefs(context: Context) {
             sp.edit().putString(KEY_CHATGPT_ENDPOINT, value.trim().ifEmpty { DEFAULT_CHATGPT_ENDPOINT }).apply()
         }
 
+    /** Menu Pop-up Melayang Anti Detek aktif. */
+    var floatingEnabled: Boolean
+        get() = readBool(KEY_FLOATING_ENABLED, false)
+        set(value) = writeBool(KEY_FLOATING_ENABLED, value)
+
+    /** Opasitas/transparansi tombol melayang (persen: 10% sangat samar s.d 100% jelas). */
+    var floatingOpacity: Int
+        get() = readInt(KEY_FLOATING_OPACITY, 35, 10, 100)
+        set(value) = writeInt(KEY_FLOATING_OPACITY, value, 10, 100)
+
+    /** Ukuran tombol melayang dalam dp (24 s.d 64). */
+    var floatingSizeDp: Int
+        get() = readInt(KEY_FLOATING_SIZE, 36, 24, 64)
+        set(value) = writeInt(KEY_FLOATING_SIZE, value, 24, 64)
+
+    /** Buka menu pop-up lewat ketuk 2x tombol spasi di keyboard. */
+    var floatingKbTrigger: Boolean
+        get() = readBool(KEY_FLOATING_KB_TRIGGER, true)
+        set(value) = writeBool(KEY_FLOATING_KB_TRIGGER, value)
+
     /** Tombol kontrol kursor di bilah Tools (panah, pilih, salin, tempel, potong). */
     var cursorTool: Boolean
         get() = readBool(KEY_CURSOR_TOOL, true)
@@ -475,6 +495,10 @@ class Prefs(context: Context) {
         private const val KEY_CHATGPT_ENDPOINT = "chatgpt_endpoint"
         const val DEFAULT_CHATGPT_MODEL = "gpt-4o-mini"
         const val DEFAULT_CHATGPT_ENDPOINT = "https://api.openai.com/v1/chat/completions"
+        const val KEY_FLOATING_ENABLED = "floating_enabled"
+        const val KEY_FLOATING_OPACITY = "floating_opacity"
+        const val KEY_FLOATING_SIZE = "floating_size_dp"
+        const val KEY_FLOATING_KB_TRIGGER = "floating_kb_trigger"
 
         /** Semua kunci pengaturan mengetik (semua kecuali tema). */
         private val TYPING_KEYS = listOf(

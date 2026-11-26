@@ -61,6 +61,18 @@
     <string name="key_space">Spasi</string>
 
     <!-- Kalkulator Ilmiah, Modul SMP Kelas 9, Aksara Jawa, dan Tanya AI (9router) -->
+    <string name="floating_card_title">Menu Melayang Anti Detek</string>
+    <string name="floating_card_desc">Tombol tersamar melayang di layar: ketuk 2x untuk membuka popup cari Google, tanya AI, atau hitung matematika cepat</string>
+    <string name="floating_overlay_permission_title">Izin Menampilkan di Atas Aplikasi</string>
+    <string name="floating_overlay_permission_desc">Aktifkan izin Tampilkan di Atas Aplikasi Lain agar menu melayang dapat muncul di atas aplikasi apa pun.</string>
+    <string name="floating_menu_title">Asisten Cepat</string>
+    <string name="floating_tab_ai">Tanya AI</string>
+    <string name="floating_tab_google">Google Web</string>
+    <string name="floating_tab_math">SMP 9</string>
+    <string name="floating_btn_paste">Tempel</string>
+    <string name="floating_btn_ask">Tanya</string>
+    <string name="floating_btn_copy">Salin</string>
+    <string name="floating_btn_close">Tutup (2x)</string>
     <string name="calc_title">Kalkulator</string>
     <string name="calc_modules_btn">SMP 9</string>
     <string name="calc_hint">Ketik hitungan…</string>

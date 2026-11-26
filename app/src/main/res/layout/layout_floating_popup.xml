@@ -1,0 +1,366 @@
+<?xml version="1.0" encoding="utf-8"?>
+<LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
+    android:id="@+id/floatingRoot"
+    android:layout_width="match_parent"
+    android:layout_height="wrap_content"
+    android:background="@drawable/bg_floating_popup"
+    android:orientation="vertical"
+    android:padding="12dp">
+
+    <!-- Header bar: draggable + double tap to close -->
+    <LinearLayout
+        android:id="@+id/floatingHeader"
+        android:layout_width="match_parent"
+        android:layout_height="36dp"
+        android:gravity="center_vertical"
+        android:orientation="horizontal">
+
+        <TextView
+            android:id="@+id/tvFloatingTitle"
+            android:layout_width="0dp"
+            android:layout_height="wrap_content"
+            android:layout_weight="1"
+            android:text="Asisten Cepat (2x ketuk tutup)"
+            android:textColor="#E2E8F0"
+            android:textSize="13sp"
+            android:textStyle="bold" />
+
+        <TextView
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:background="@drawable/bg_pill"
+            android:paddingHorizontal="6dp"
+            android:paddingVertical="2dp"
+            android:text="Anti Detek"
+            android:textColor="#94A3B8"
+            android:textSize="10sp" />
+
+        <ImageButton
+            android:id="@+id/btnFloatingClose"
+            android:layout_width="32dp"
+            android:layout_height="32dp"
+            android:layout_marginStart="8dp"
+            android:background="?android:attr/selectableItemBackgroundBorderless"
+            android:contentDescription="Tutup"
+            android:padding="6dp"
+            android:scaleType="fitCenter"
+            android:src="@drawable/ic_kb_close" />
+    </LinearLayout>
+
+    <!-- Navigasi Tabs -->
+    <LinearLayout
+        android:layout_width="match_parent"
+        android:layout_height="36dp"
+        android:layout_marginTop="6dp"
+        android:orientation="horizontal">
+
+        <TextView
+            android:id="@+id/tabAi"
+            android:layout_width="0dp"
+            android:layout_height="match_parent"
+            android:layout_marginEnd="4dp"
+            android:layout_weight="1"
+            android:background="@drawable/bg_floating_tab"
+            android:gravity="center"
+            android:selected="true"
+            android:text="✨ Tanya AI"
+            android:textColor="#FFFFFF"
+            android:textSize="12sp"
+            android:textStyle="bold" />
+
+        <TextView
+            android:id="@+id/tabGoogle"
+            android:layout_width="0dp"
+            android:layout_height="match_parent"
+            android:layout_marginHorizontal="2dp"
+            android:layout_weight="1"
+            android:background="@drawable/bg_floating_tab"
+            android:gravity="center"
+            android:text="🔍 Google Web"
+            android:textColor="#FFFFFF"
+            android:textSize="12sp"
+            android:textStyle="bold" />
+
+        <TextView
+            android:id="@+id/tabMath"
+            android:layout_width="0dp"
+            android:layout_height="match_parent"
+            android:layout_marginStart="4dp"
+            android:layout_weight="1"
+            android:background="@drawable/bg_floating_tab"
+            android:gravity="center"
+            android:text="∑ SMP 9"
+            android:textColor="#FFFFFF"
+            android:textSize="12sp"
+            android:textStyle="bold" />
+    </LinearLayout>
+
+    <!-- Content Frame -->
+    <FrameLayout
+        android:id="@+id/floatingContentFrame"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:layout_marginTop="8dp">
+
+        <!-- Tab 1: AI / ChatGPT -->
+        <LinearLayout
+            android:id="@+id/panelAi"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:orientation="vertical"
+            android:visibility="visible">
+
+            <EditText
+                android:id="@+id/etAiQuestion"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:background="@drawable/bg_input"
+                android:hint="Tulis pertanyaan atau soal cerita…"
+                android:inputType="textMultiLine"
+                android:maxLines="3"
+                android:minLines="2"
+                android:padding="8dp"
+                android:textColor="#FFFFFF"
+                android:textColorHint="#94A3B8"
+                android:textSize="13sp" />
+
+            <LinearLayout
+                android:layout_width="match_parent"
+                android:layout_height="32dp"
+                android:layout_marginTop="6dp"
+                android:orientation="horizontal">
+
+                <Button
+                    android:id="@+id/btnAiPaste"
+                    style="?android:attr/borderlessButtonStyle"
+                    android:layout_width="wrap_content"
+                    android:layout_height="match_parent"
+                    android:background="@drawable/bg_pill"
+                    android:paddingHorizontal="10dp"
+                    android:text="📋 Tempel"
+                    android:textColor="#E2E8F0"
+                    android:textSize="11sp" />
+
+                <Button
+                    android:id="@+id/btnAiClear"
+                    style="?android:attr/borderlessButtonStyle"
+                    android:layout_width="wrap_content"
+                    android:layout_height="match_parent"
+                    android:layout_marginStart="6dp"
+                    android:background="@drawable/bg_pill"
+                    android:paddingHorizontal="10dp"
+                    android:text="Bersihkan"
+                    android:textColor="#94A3B8"
+                    android:textSize="11sp" />
+
+                <View
+                    android:layout_width="0dp"
+                    android:layout_height="1dp"
+                    android:layout_weight="1" />
+
+                <Button
+                    android:id="@+id/btnAiSubmit"
+                    android:layout_width="wrap_content"
+                    android:layout_height="match_parent"
+                    android:background="@drawable/bg_btn"
+                    android:paddingHorizontal="14dp"
+                    android:text="Tanya AI"
+                    android:textColor="#FFFFFF"
+                    android:textSize="12sp"
+                    android:textStyle="bold" />
+            </LinearLayout>
+
+            <ScrollView
+                android:layout_width="match_parent"
+                android:layout_height="120dp"
+                android:layout_marginTop="8dp"
+                android:background="@drawable/bg_card"
+                android:padding="8dp">
+
+                <TextView
+                    android:id="@+id/tvAiResponse"
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:text="Hasil jawaban AI akan muncul di sini…"
+                    android:textColor="#F1F5F9"
+                    android:textSize="12sp" />
+            </ScrollView>
+
+            <Button
+                android:id="@+id/btnAiCopy"
+                style="?android:attr/borderlessButtonStyle"
+                android:layout_width="match_parent"
+                android:layout_height="34dp"
+                android:layout_marginTop="6dp"
+                android:background="@drawable/bg_pill"
+                android:text="📋 Salin Jawaban AI"
+                android:textColor="#38BDF8"
+                android:textSize="12sp"
+                android:textStyle="bold" />
+        </LinearLayout>
+
+        <!-- Tab 2: Mini Google Search Webview -->
+        <LinearLayout
+            android:id="@+id/panelGoogle"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:orientation="vertical"
+            android:visibility="gone">
+
+            <LinearLayout
+                android:layout_width="match_parent"
+                android:layout_height="36dp"
+                android:orientation="horizontal">
+
+                <EditText
+                    android:id="@+id/etGoogleQuery"
+                    android:layout_width="0dp"
+                    android:layout_height="match_parent"
+                    android:layout_weight="1"
+                    android:background="@drawable/bg_input"
+                    android:hint="Cari Google…"
+                    android:imeOptions="actionSearch"
+                    android:inputType="text"
+                    android:maxLines="1"
+                    android:paddingHorizontal="8dp"
+                    android:textColor="#FFFFFF"
+                    android:textColorHint="#94A3B8"
+                    android:textSize="12sp" />
+
+                <Button
+                    android:id="@+id/btnGoogleSearch"
+                    android:layout_width="wrap_content"
+                    android:layout_height="match_parent"
+                    android:layout_marginStart="6dp"
+                    android:background="@drawable/bg_btn"
+                    android:paddingHorizontal="12dp"
+                    android:text="Cari"
+                    android:textColor="#FFFFFF"
+                    android:textSize="12sp" />
+            </LinearLayout>
+
+            <!-- Navigasi mini webview -->
+            <LinearLayout
+                android:layout_width="match_parent"
+                android:layout_height="28dp"
+                android:layout_marginTop="4dp"
+                android:gravity="center_vertical"
+                android:orientation="horizontal">
+
+                <Button
+                    android:id="@+id/btnWebBack"
+                    style="?android:attr/borderlessButtonStyle"
+                    android:layout_width="40dp"
+                    android:layout_height="match_parent"
+                    android:text="←"
+                    android:textColor="#E2E8F0"
+                    android:textSize="14sp" />
+
+                <Button
+                    android:id="@+id/btnWebReload"
+                    style="?android:attr/borderlessButtonStyle"
+                    android:layout_width="40dp"
+                    android:layout_height="match_parent"
+                    android:text="🔄"
+                    android:textColor="#E2E8F0"
+                    android:textSize="12sp" />
+
+                <TextView
+                    android:id="@+id/tvWebUrl"
+                    android:layout_width="0dp"
+                    android:layout_height="wrap_content"
+                    android:layout_weight="1"
+                    android:ellipsize="end"
+                    android:maxLines="1"
+                    android:text="https://www.google.com"
+                    android:textColor="#64748B"
+                    android:textSize="10sp" />
+            </LinearLayout>
+
+            <WebView
+                android:id="@+id/wvGoogle"
+                android:layout_width="match_parent"
+                android:layout_height="220dp"
+                android:layout_marginTop="4dp"
+                android:background="#1E293B" />
+        </LinearLayout>
+
+        <!-- Tab 3: SMP 9 Math Quick Solver -->
+        <LinearLayout
+            android:id="@+id/panelMath"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:orientation="vertical"
+            android:visibility="gone">
+
+            <HorizontalScrollView
+                android:layout_width="match_parent"
+                android:layout_height="32dp"
+                android:scrollbars="none">
+
+                <LinearLayout
+                    android:id="@+id/mathChipsRow"
+                    android:layout_width="wrap_content"
+                    android:layout_height="match_parent"
+                    android:orientation="horizontal" />
+            </HorizontalScrollView>
+
+            <TextView
+                android:id="@+id/tvFloatingMathDesc"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:layout_marginTop="4dp"
+                android:text="Pilih materi untuk menghitung eksak:"
+                android:textColor="#94A3B8"
+                android:textSize="11sp" />
+
+            <LinearLayout
+                android:id="@+id/mathFieldsContainer"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:layout_marginTop="4dp"
+                android:orientation="vertical" />
+
+            <Button
+                android:id="@+id/btnFloatingMathSolve"
+                android:layout_width="match_parent"
+                android:layout_height="36dp"
+                android:layout_marginTop="6dp"
+                android:background="@drawable/bg_btn"
+                android:text="Hitung Solusi Eksak"
+                android:textColor="#FFFFFF"
+                android:textSize="12sp"
+                android:textStyle="bold" />
+
+            <ScrollView
+                android:layout_width="match_parent"
+                android:layout_height="100dp"
+                android:layout_marginTop="6dp"
+                android:background="@drawable/bg_card"
+                android:padding="8dp">
+
+                <TextView
+                    android:id="@+id/tvFloatingMathResult"
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:text="Jawaban dan langkah eksak akan tampil di sini…"
+                    android:textColor="#F1F5F9"
+                    android:textSize="11.5sp" />
+            </ScrollView>
+
+            <Button
+                android:id="@+id/btnFloatingMathCopy"
+                style="?android:attr/borderlessButtonStyle"
+                android:layout_width="match_parent"
+                android:layout_height="32dp"
+                android:layout_marginTop="4dp"
+                android:background="@drawable/bg_pill"
+                android:text="📋 Salin Jawaban &amp; Langkah"
+                android:textColor="#38BDF8"
+                android:textSize="11sp"
+                android:textStyle="bold" />
+        </LinearLayout>
+
+    </FrameLayout>
+
+</LinearLayout>

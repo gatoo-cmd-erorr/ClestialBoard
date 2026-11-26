@@ -10,9 +10,12 @@ import android.view.View
 import android.view.inputmethod.InputMethodManager
 import android.widget.ImageView
 import android.widget.TextView
+import android.widget.Toast
 import androidx.appcompat.app.AppCompatActivity
 import androidx.appcompat.app.AppCompatDelegate
+import androidx.appcompat.widget.SwitchCompat
 import androidx.core.content.ContextCompat
+import com.clestial.keyboard.floating.FloatingMenuManager
 
 class MainActivity : AppCompatActivity() {
 
@@ -43,6 +46,8 @@ class MainActivity : AppCompatActivity() {
     private lateinit var cardTools: View
     private lateinit var cardDownloads: View
     private lateinit var cardMath: View
+    private lateinit var cardFloating: View
+    private lateinit var switchFloating: SwitchCompat
 
     private lateinit var optDark: View
     private lateinit var optLight: View
@@ -100,6 +105,8 @@ class MainActivity : AppCompatActivity() {
         cardTools = findViewById(R.id.cardTools)
         cardDownloads = findViewById(R.id.cardDownloads)
         cardMath = findViewById(R.id.cardMath)
+        cardFloating = findViewById(R.id.cardFloating)
+        switchFloating = findViewById(R.id.switchFloating)
 
         optDark = findViewById(R.id.optDark)
         optLight = findViewById(R.id.optLight)
@@ -140,6 +147,24 @@ class MainActivity : AppCompatActivity() {
         }
         cardMath.setOnClickListener {
             startActivity(Intent(this, MathModulesActivity::class.java))
+        }
+        cardFloating.setOnClickListener {
+            if (!FloatingMenuManager.canDrawOverlays(this)) {
+                Toast.makeText(this, R.string.floating_overlay_permission_desc, Toast.LENGTH_LONG).show()
+                FloatingMenuManager.requestOverlayPermission(this)
+                return@setOnClickListener
+            }
+            val next = !prefs.floatingEnabled
+            prefs.floatingEnabled = next
+            switchFloating.isChecked = next
+            if (next) {
+                FloatingMenuManager.start(this)
+                Toast.makeText(this, "Menu Melayang aktif! Ketuk 2x tombol mengambang untuk membuka.", Toast.LENGTH_SHORT).show()
+            } else {
+                FloatingMenuManager.stop(this)
+                Toast.makeText(this, "Menu Melayang dinonaktifkan.", Toast.LENGTH_SHORT).show()
+            }
+            refreshFloatingCard()
         }
 
         optDark.setOnClickListener { chooseTheme(Prefs.THEME_DARK) }
@@ -250,6 +275,24 @@ class MainActivity : AppCompatActivity() {
 
         styleStepButton(btnStep1, enabled, R.string.btn_open)
         styleStepButton(btnStep2, selected, R.string.btn_choose)
+        refreshFloatingCard()
+    }
+
+    private fun refreshFloatingCard() {
+        val canDraw = FloatingMenuManager.canDrawOverlays(this)
+        val active = canDraw && prefs.floatingEnabled
+        switchFloating.isChecked = active
+        val tvStatus = findViewById<TextView>(R.id.tvFloatingCardStatus) ?: return
+        if (!canDraw) {
+            tvStatus.text = "Izin 'Tampilkan di atas aplikasi lain' belum diberikan. Ketuk untuk memberi izin."
+            tvStatus.setTextColor(0xFFF59E0B.toInt())
+        } else if (active) {
+            tvStatus.text = "Aktif (Gelembung tersamar siap di layar). Ketuk 2x gelembung untuk buka menu."
+            tvStatus.setTextColor(0xFF10B981.toInt())
+        } else {
+            tvStatus.text = getString(R.string.floating_card_desc)
+            tvStatus.setTextColor(ContextCompat.getColor(this, R.color.muted))
+        }
     }
 
     private fun styleStepButton(button: TextView, done: Boolean, idleText: Int) {

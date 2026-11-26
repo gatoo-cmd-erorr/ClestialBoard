@@ -39,6 +39,7 @@ import com.clestial.keyboard.math.MathModule
 import com.clestial.keyboard.math.MathRegistry
 import com.clestial.keyboard.math.ScientificCalculator
 import com.clestial.keyboard.math.SolveResult
+import com.clestial.keyboard.floating.FloatingMenuManager
 import kotlin.math.abs
 import kotlin.math.ceil
 import kotlin.math.max
@@ -364,6 +365,7 @@ class ClestialKeyboardView(context: Context) : View(context) {
     private var mathFormulaDownY = 0f
     private var mathFormulaStartScrollY = 0f
     private var mathInputModeAlpha = false
+    private var lastSpaceTapTime = 0L
     private val editRepeatRunnable = object : Runnable {
         override fun run() {
             val action = editActionFor(editDownButton) ?: return
@@ -5678,7 +5680,16 @@ class ClestialKeyboardView(context: Context) : View(context) {
     private fun perform(key: Key) {
         when (key.type) {
             KeyType.CHARACTER -> commitCharacter(key)
-            KeyType.SPACE -> if (isOverlayInputOpen) overlayInsertText(" ") else listener?.onKeyText(" ")
+            KeyType.SPACE -> {
+                val now = System.currentTimeMillis()
+                if (prefs.floatingKbTrigger && now - lastSpaceTapTime < 380 && FloatingMenuManager.canDrawOverlays(context)) {
+                    FloatingMenuManager.toggle(context)
+                    lastSpaceTapTime = 0L
+                } else {
+                    lastSpaceTapTime = now
+                    if (isOverlayInputOpen) overlayInsertText(" ") else listener?.onKeyText(" ")
+                }
+            }
             KeyType.SHIFT -> toggleShift()
             KeyType.ENTER -> when {
                 trOpen -> trRun()

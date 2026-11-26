@@ -423,6 +423,48 @@
                         android:tint="@color/muted" />
                 </LinearLayout>
 
+                <!-- B5. Menu Melayang Anti Detek (Floating Pop-up) -->
+                <LinearLayout
+                    android:id="@+id/cardFloating"
+                    style="@style/ClestialCard"
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:layout_marginTop="10dp"
+                    android:clickable="true"
+                    android:focusable="true"
+                    android:gravity="center_vertical"
+                    android:orientation="horizontal">
+
+                    <LinearLayout
+                        android:layout_width="0dp"
+                        android:layout_height="wrap_content"
+                        android:layout_weight="1"
+                        android:orientation="vertical">
+
+                        <TextView
+                            style="@style/ClestialTitle"
+                            android:layout_width="wrap_content"
+                            android:layout_height="wrap_content"
+                            android:text="@string/floating_card_title" />
+
+                        <TextView
+                            android:id="@+id/tvFloatingCardStatus"
+                            style="@style/ClestialDesc"
+                            android:layout_width="wrap_content"
+                            android:layout_height="wrap_content"
+                            android:layout_marginTop="2dp"
+                            android:text="@string/floating_card_desc" />
+                    </LinearLayout>
+
+                    <androidx.appcompat.widget.SwitchCompat
+                        android:id="@+id/switchFloating"
+                        android:layout_width="wrap_content"
+                        android:layout_height="wrap_content"
+                        android:layout_marginStart="12dp"
+                        android:clickable="false"
+                        android:focusable="false" />
+                </LinearLayout>
+
                 <!-- Pembatas Stud LEGO B3 | C -->
                 <com.clestial.keyboard.LegoStudStripView
                     android:layout_width="match_parent"
