@@ -77,4 +77,24 @@ class AbcdSolverTest {
         assertEquals("O(log n)", parsed.optionText)
         assertTrue(parsed.explanation.contains("O(log n)"))
     }
+
+    @Test
+    fun testSolveLocally_spldvSystem() {
+        val q = AbcdQuestion(
+            questionText = "Penyelesaian dari sistem persamaan 2x - y = 7 dan x + 3y = -7 adalah ....",
+            options = mapOf(
+                'A' to "x = 2 dan y = -3",
+                'B' to "x = -2 dan y = 3",
+                'C' to "x = 3 dan y = -1",
+                'D' to "x = 2 dan y = 3"
+            )
+        )
+        val res = AbcdSolver.solveLocally(q)
+        assertTrue(res.ok)
+        assertEquals('A', res.selectedOption)
+
+        val offline = com.clestial.keyboard.math.OfflineMathAssistant.trySolveMathQuestion("2x - y = 7 dan x + 3y = -7")
+        assertNotNull(offline)
+        assertTrue(offline!!.contains("x = 2") && offline.contains("y = -3"))
+    }
 }

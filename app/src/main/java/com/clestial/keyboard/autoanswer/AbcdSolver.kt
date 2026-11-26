@@ -4,6 +4,10 @@ import android.os.Handler
 import android.os.Looper
 import com.clestial.keyboard.Prefs
 import com.clestial.keyboard.math.AiRouterClient
+import com.clestial.keyboard.math.OfflineMathAssistant
+import com.clestial.keyboard.math.PlsvModule
+import com.clestial.keyboard.math.ScientificCalculator
+import com.clestial.keyboard.math.SpldvModule
 import java.util.Locale
 import java.util.regex.Pattern
 
@@ -243,7 +247,47 @@ PENJELASAN: [Alasan singkat dalam 1-2 kalimat]
     }
 
     private fun trySolveMath(q: String, opts: Map<Char, String>): AbcdSolutionResult? {
-        // Persamaan linear satu variabel: ax + b = c atau ax - b = c
+        val normQ = q.replace("−", "-").replace("–", "-")
+
+        // 0. Sistem Persamaan Linear Dua Variabel (SPLDV): dua persamaan x & y
+        val eqRegex = Regex("""([0-9\+\-\*\.\s]*[xXyY][0-9a-zA-Z\+\-\*\.\s]*=[0-9\+\-\.\s]+)""")
+        val eqMatches = eqRegex.findAll(normQ).map { it.groupValues[1].trim() }.toList()
+        if (eqMatches.size >= 2) {
+            val p1 = OfflineMathAssistant.parseLinearXY(eqMatches[0])
+            val p2 = OfflineMathAssistant.parseLinearXY(eqMatches[1])
+            if (p1 != null && p2 != null) {
+                val spldvRes = SpldvModule().solve(
+                    mapOf(
+                        "a1" to p1.first, "b1" to p1.second, "c1" to p1.third,
+                        "a2" to p2.first, "b2" to p2.second, "c2" to p2.third
+                    )
+                )
+                if (spldvRes.ok) {
+                    val xValMatch = Regex("""x\s*=\s*(-?\d+(?:/\d+)?)""").find(spldvRes.answer)
+                    val yValMatch = Regex("""y\s*=\s*(-?\d+(?:/\d+)?)""").find(spldvRes.answer)
+                    val xStr = xValMatch?.groupValues?.get(1)
+                    val yStr = yValMatch?.groupValues?.get(1)
+                    if (xStr != null && yStr != null) {
+                        for ((k, v) in opts) {
+                            val optX = Regex("""x\s*=\s*(-?\d+(?:/\d+)?)""", RegexOption.IGNORE_CASE).find(v)?.groupValues?.get(1)
+                            val optY = Regex("""y\s*=\s*(-?\d+(?:/\d+)?)""", RegexOption.IGNORE_CASE).find(v)?.groupValues?.get(1)
+                            if (optX == xStr && optY == yStr) {
+                                return AbcdSolutionResult(
+                                    ok = true,
+                                    selectedOption = k,
+                                    optionText = v,
+                                    explanation = "SPLDV (${eqMatches[0]} & ${eqMatches[1]}) → ${spldvRes.answer}.",
+                                    confidence = 0.99f,
+                                    source = "Solver Matematika Eksak (SPLDV)"
+                                )
+                            }
+                        }
+                    }
+                }
+            }
+        }
+
+        // 1. Persamaan linear satu variabel: ax + b = c atau ax - b = c
         val plsvRegex = Regex("""(\d+)\s*[xX]\s*([\+\-])\s*(\d+)\s*=\s*(\d+)""")
         val plsvMatch = plsvRegex.find(q)
         if (plsvMatch != null) {

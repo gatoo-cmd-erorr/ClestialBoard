@@ -5,15 +5,17 @@ import android.accessibilityservice.GestureDescription
 import android.content.ClipData
 import android.content.ClipboardManager
 import android.content.Context
+import android.graphics.Bitmap
 import android.graphics.Path
 import android.graphics.Rect
 import android.os.Build
 import android.os.Handler
 import android.os.Looper
+import android.view.Display
 import android.view.accessibility.AccessibilityEvent
 import android.view.accessibility.AccessibilityNodeInfo
-import android.widget.Toast
 import com.clestial.keyboard.Prefs
+import com.clestial.keyboard.floating.ScreenOcrProcessor
 import java.util.Locale
 
 class AutoAnswerAccessibilityService : AccessibilityService() {
@@ -27,6 +29,7 @@ class AutoAnswerAccessibilityService : AccessibilityService() {
 
         var onStatusChangedListener: ((Boolean) -> Unit)? = null
         var onAnswerResultListener: ((AbcdSolutionResult) -> Unit)? = null
+        var onProgressUpdateListener: ((Int, Int) -> Unit)? = null
     }
 
     private lateinit var prefs: Prefs
@@ -36,30 +39,36 @@ class AutoAnswerAccessibilityService : AccessibilityService() {
     private var lastAnswerTimeMs: Long = 0L
     private var isAnsweringInProgress = false
 
+    var isContinuousRunning: Boolean = false
+        private set
+    var isKkmMode: Boolean = false
+        private set
+    var answeredCount: Int = 0
+        private set
+    var totalQuestionsEstimate: Int = 30
+
     override fun onServiceConnected() {
         super.onServiceConnected()
         instance = this
         prefs = Prefs(this)
         onStatusChangedListener?.invoke(true)
-        Toast.makeText(this, "Asisten Auto Jawab ABCD Aktif!", Toast.LENGTH_SHORT).show()
     }
 
     override fun onAccessibilityEvent(event: AccessibilityEvent?) {
         if (event == null) return
         if (!prefs.autoAnswerEnabled) return
-        if (prefs.autoAnswerMode != Prefs.MODE_AUTO_CLICK) return
+        if (!isContinuousRunning && prefs.autoAnswerMode != Prefs.MODE_AUTO_CLICK) return
 
         val eventType = event.eventType
         if (eventType == AccessibilityEvent.TYPE_WINDOW_STATE_CHANGED ||
             eventType == AccessibilityEvent.TYPE_WINDOW_CONTENT_CHANGED
         ) {
-            // Evaluasi otomatis jika jendela aplikasi kuis/ujian berganti soal
             checkAndAutoAnswerDebounced()
         }
     }
 
     override fun onInterrupt() {
-        // Layanan terhenti sementara oleh sistem
+        isContinuousRunning = false
     }
 
     override fun onDestroy() {
@@ -70,17 +79,36 @@ class AutoAnswerAccessibilityService : AccessibilityService() {
         onStatusChangedListener?.invoke(false)
     }
 
+    fun startAuto100() {
+        isContinuousRunning = true
+        isKkmMode = false
+        triggerAutoAnswer { _, _ -> }
+    }
+
+    fun startAutoKkm() {
+        isContinuousRunning = true
+        isKkmMode = true
+        triggerAutoAnswer { _, _ -> }
+    }
+
+    fun stopGeneration() {
+        isContinuousRunning = false
+        isAnsweringInProgress = false
+    }
+
     private fun checkAndAutoAnswerDebounced() {
         if (isAnsweringInProgress) return
         val now = System.currentTimeMillis()
-        if (now - lastAnswerTimeMs < 3500) return
+        val tempoDelay = prefs.autoAnswerDelayMs.toLong().coerceAtLeast(1000L)
+        if (now - lastAnswerTimeMs < tempoDelay) return
 
         triggerAutoAnswer { _, _ -> }
     }
 
     /**
-     * Memindai tampilan layar saat ini, mengenali soal & pilihan A/B/C/D,
-     * memecahkan jawaban via [AbcdSolver], lalu mengeksekusi klik otomatis atau menyalin kunci.
+     * Memindai tampilan layar aplikasi dosen, mendeteksi soal & pilihan A/B/C/D,
+     * memecahkan jawaban via [AbcdSolver], lalu melakukan klik otomatis secara SENYAP
+     * (tanpa notifikasi/toast samaran yang mencurigakan).
      */
     fun triggerAutoAnswer(onDone: (Boolean, String) -> Unit) {
         val root = rootInActiveWindow ?: run {
@@ -96,8 +124,9 @@ class AutoAnswerAccessibilityService : AccessibilityService() {
 
         val (question, optionNodes) = scanResult
 
-        // Cegah klik berulang pada soal yang sama
-        if (question.questionText == lastQuestionStem && System.currentTimeMillis() - lastAnswerTimeMs < 3500) {
+        // Cegah klik berulang pada soal yang sama dalam jeda tempo
+        val tempo = prefs.autoAnswerDelayMs.toLong().coerceAtLeast(1000L)
+        if (question.questionText == lastQuestionStem && System.currentTimeMillis() - lastAnswerTimeMs < tempo) {
             onDone(false, "Soal ini baru saja dijawab.")
             return
         }
@@ -110,35 +139,38 @@ class AutoAnswerAccessibilityService : AccessibilityService() {
                 onAnswerResultListener?.invoke(solution)
 
                 if (solution.ok && solution.selectedOption != null) {
-                    val targetChar = solution.selectedOption
+                    var targetChar = solution.selectedOption
+
+                    // Jika mode KKM 80 aktif, sesekali pilih opsi realistis lain (~20% kasus) agar skor natural 24/30
+                    if (isKkmMode && (answeredCount % 5 == 3)) {
+                        val otherOptions = optionNodes.keys.filter { it != targetChar }
+                        if (otherOptions.isNotEmpty()) {
+                            targetChar = otherOptions.first()
+                        }
+                    }
+
                     lastQuestionStem = question.questionText
                     lastAnswerTimeMs = System.currentTimeMillis()
+                    answeredCount++
+                    onProgressUpdateListener?.invoke(answeredCount, totalQuestionsEstimate)
 
                     val targetNodeInfo = optionNodes[targetChar]
                     val delay = prefs.autoAnswerDelayMs.toLong().coerceAtLeast(0L)
 
-                    if (prefs.autoAnswerMode == Prefs.MODE_AUTO_CLICK && targetNodeInfo != null) {
+                    if (targetNodeInfo != null) {
                         mainHandler.postDelayed({
                             clickNode(targetNodeInfo.node) { success ->
-                                val msg = if (success) {
-                                    "🎯 Terjawab otomatis: [${targetChar}] ${solution.optionText}"
-                                } else {
-                                    "🎯 Kunci: [${targetChar}] (Gagal klik langsung, kunci disalin)"
-                                }
-                                Toast.makeText(applicationContext, msg, Toast.LENGTH_SHORT).show()
                                 copyToClipboard(solution)
+                                val msg = "Terpilih [${targetChar}]"
                                 onDone(success, msg)
                             }
                         }, delay)
                     } else {
-                        // Mode Kunci Saja
                         copyToClipboard(solution)
-                        val msg = "🎯 Kunci Jawaban: [${targetChar}] ${solution.optionText} (Disalin)"
-                        Toast.makeText(applicationContext, msg, Toast.LENGTH_LONG).show()
-                        onDone(true, msg)
+                        onDone(true, "Kunci [${targetChar}] disalin")
                     }
                 } else {
-                    onDone(false, solution.error ?: "Gagal menentukan jawaban yang tepat.")
+                    onDone(false, solution.error ?: "Gagal menentukan jawaban.")
                 }
             }
         }
@@ -173,7 +205,7 @@ class AutoAnswerAccessibilityService : AccessibilityService() {
             }
         }
 
-        // Cek jika ada tombol radio / pilihan yang terpisah antara huruf label dan teksnya
+        // Cek jika huruf opsi (A, B, C, D) dan teks jawabannya berada pada node bersebelahan
         if (optionsMap.size < 2) {
             for (i in 0 until allTextNodes.size - 1) {
                 val cur = allTextNodes[i].text.trim()
@@ -192,7 +224,7 @@ class AutoAnswerAccessibilityService : AccessibilityService() {
 
         if (optionsMap.size >= 2) {
             val stem = nonOptionTexts.filter { it.length > 5 }.joinToString(" ").trim()
-                .ifEmpty { "Pertanyaan Pilihan Ganda" }
+                .ifEmpty { "Pertanyaan CBT" }
             return Pair(
                 AbcdQuestion(questionText = stem, options = optionsMap),
                 optionNodes
@@ -222,8 +254,7 @@ class AutoAnswerAccessibilityService : AccessibilityService() {
     }
 
     /**
-     * Mengklik node di layar: mencoba ACTION_CLICK langsung,
-     * parent ACTION_CLICK, atau tap gestur layar [dispatchGesture] jika view tidak clickable.
+     * Mengeksekusi klik langsung tanpa animasi/notifikasi yang mencurigakan.
      */
     private fun clickNode(node: AccessibilityNodeInfo, onComplete: (Boolean) -> Unit) {
         if (node.isClickable && node.performAction(AccessibilityNodeInfo.ACTION_CLICK)) {
@@ -231,7 +262,6 @@ class AutoAnswerAccessibilityService : AccessibilityService() {
             return
         }
 
-        // Cek parent clickable
         var parent = node.parent
         while (parent != null) {
             if (parent.isClickable && parent.performAction(AccessibilityNodeInfo.ACTION_CLICK)) {
@@ -241,7 +271,7 @@ class AutoAnswerAccessibilityService : AccessibilityService() {
             parent = parent.parent
         }
 
-        // Fallback: Gestur tap fisik pada koordinat layar view
+        // Gestur fisik senyap pada koordinat layar view
         val rect = Rect()
         node.getBoundsInScreen(rect)
         val x = rect.centerX().toFloat()
@@ -249,7 +279,7 @@ class AutoAnswerAccessibilityService : AccessibilityService() {
 
         if (x > 0 && y > 0 && Build.VERSION.SDK_INT >= Build.VERSION_CODES.N) {
             val path = Path().apply { moveTo(x, y) }
-            val stroke = GestureDescription.StrokeDescription(path, 0, 100)
+            val stroke = GestureDescription.StrokeDescription(path, 0, 80)
             val gesture = GestureDescription.Builder().addStroke(stroke).build()
 
             val dispatched = dispatchGesture(gesture, object : GestureResultCallback() {
@@ -272,7 +302,59 @@ class AutoAnswerAccessibilityService : AccessibilityService() {
 
     private fun copyToClipboard(solution: AbcdSolutionResult) {
         val cm = getSystemService(Context.CLIPBOARD_SERVICE) as ClipboardManager
-        val text = "Kunci: [${solution.selectedOption}] ${solution.optionText}\nPenjelasan: ${solution.explanation}"
-        cm.setPrimaryClip(ClipData.newPlainText("Kunci Jawaban Soal", text))
+        val text = "Kunci: [${solution.selectedOption}] ${solution.optionText}"
+        cm.setPrimaryClip(ClipData.newPlainText("Kunci CBT", text))
+    }
+
+    /**
+     * Tangkap layar senyap (Android 11+) tanpa memunculkan dialog "Bagikan layar".
+     */
+    fun captureRegionSilent(cropX: Int, cropY: Int, cropW: Int, cropH: Int, onFallback: () -> Unit) {
+        if (Build.VERSION.SDK_INT < Build.VERSION_CODES.R) {
+            onFallback()
+            return
+        }
+        mainHandler.postDelayed({
+            try {
+                takeScreenshot(
+                    Display.DEFAULT_DISPLAY,
+                    mainExecutor,
+                    object : TakeScreenshotCallback {
+                        override fun onSuccess(screenshot: ScreenshotResult) {
+                            try {
+                                val hwBitmap = Bitmap.wrapHardwareBuffer(
+                                    screenshot.hardwareBuffer,
+                                    screenshot.colorSpace
+                                )
+                                screenshot.hardwareBuffer.close()
+                                if (hwBitmap != null) {
+                                    val softBitmap = hwBitmap.copy(Bitmap.Config.ARGB_8888, false)
+                                    hwBitmap.recycle()
+                                    val safeX = cropX.coerceIn(0, softBitmap.width - 1)
+                                    val safeY = cropY.coerceIn(0, softBitmap.height - 1)
+                                    val safeW = cropW.coerceAtMost(softBitmap.width - safeX).coerceAtLeast(1)
+                                    val safeH = cropH.coerceAtMost(softBitmap.height - safeY).coerceAtLeast(1)
+                                    val cropped = Bitmap.createBitmap(softBitmap, safeX, safeY, safeW, safeH)
+                                    softBitmap.recycle()
+                                    ScreenOcrProcessor.processCroppedBitmap(applicationContext, cropped)
+                                } else {
+                                    onFallback()
+                                }
+                            } catch (e: Exception) {
+                                e.printStackTrace()
+                                onFallback()
+                            }
+                        }
+
+                        override fun onFailure(errorCode: Int) {
+                            onFallback()
+                        }
+                    }
+                )
+            } catch (e: Exception) {
+                e.printStackTrace()
+                onFallback()
+            }
+        }, 120)
     }
 }

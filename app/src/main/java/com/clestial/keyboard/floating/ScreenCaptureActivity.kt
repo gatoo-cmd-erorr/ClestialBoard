@@ -1,32 +1,16 @@
 package com.clestial.keyboard.floating
 
 import android.app.Activity
-import android.content.ClipData
-import android.content.ClipboardManager
 import android.content.Context
 import android.content.Intent
-import android.graphics.Bitmap
-import android.graphics.PixelFormat
-import android.hardware.display.DisplayManager
-import android.hardware.display.VirtualDisplay
-import android.media.ImageReader
-import android.media.projection.MediaProjection
 import android.media.projection.MediaProjectionManager
 import android.os.Bundle
-import android.os.Handler
-import android.os.Looper
 import android.widget.Toast
-import com.clestial.keyboard.Prefs
-import com.clestial.keyboard.autoanswer.AbcdSolver
-import com.clestial.keyboard.autoanswer.AutoAnswerAccessibilityService
-import com.google.mlkit.vision.common.InputImage
-import com.google.mlkit.vision.text.TextRecognition
-import com.google.mlkit.vision.text.latin.TextRecognizerOptions
+import androidx.core.content.ContextCompat
 
 /**
- * Activity transparan untuk menangkap gambar layar area kotak seleksi (Circle to Search / Crop Soal)
- * menggunakan MediaProjection resmi Android, lalu mengekstrak teks soal dengan ML Kit Text Recognition
- * dan langsung membuka Google Search melayang secara real-time.
+ * Activity transparan untuk meminta izin MediaProjection, lalu langsung mendelegasikan
+ * tangkapan layar ke [MediaProjectionCaptureService] (wajib ForegroundService di Android 14+).
  */
 class ScreenCaptureActivity : Activity() {
 
@@ -42,11 +26,7 @@ class ScreenCaptureActivity : Activity() {
     private var cropY = 0
     private var cropW = 0
     private var cropH = 0
-
     private var projectionManager: MediaProjectionManager? = null
-    private var mediaProjection: MediaProjection? = null
-    private var virtualDisplay: VirtualDisplay? = null
-    private var imageReader: ImageReader? = null
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
@@ -61,6 +41,7 @@ class ScreenCaptureActivity : Activity() {
             startActivityForResult(captureIntent, REQUEST_CODE_CAPTURE)
         } else {
             Toast.makeText(this, "MediaProjection tidak didukung", Toast.LENGTH_SHORT).show()
+            FloatingMenuManager.start(applicationContext)
             finish()
         }
     }
@@ -69,130 +50,20 @@ class ScreenCaptureActivity : Activity() {
         super.onActivityResult(requestCode, resultCode, data)
         if (requestCode == REQUEST_CODE_CAPTURE) {
             if (resultCode == RESULT_OK && data != null) {
-                captureAndProcess(data)
+                val svcIntent = Intent(this, MediaProjectionCaptureService::class.java).apply {
+                    putExtra(MediaProjectionCaptureService.EXTRA_RESULT_CODE, resultCode)
+                    putExtra(MediaProjectionCaptureService.EXTRA_RESULT_DATA, data)
+                    putExtra(MediaProjectionCaptureService.EXTRA_CROP_X, cropX)
+                    putExtra(MediaProjectionCaptureService.EXTRA_CROP_Y, cropY)
+                    putExtra(MediaProjectionCaptureService.EXTRA_CROP_W, cropW)
+                    putExtra(MediaProjectionCaptureService.EXTRA_CROP_H, cropH)
+                }
+                ContextCompat.startForegroundService(this, svcIntent)
             } else {
                 Toast.makeText(this, "Tangkapan layar dibatalkan", Toast.LENGTH_SHORT).show()
-                finish()
+                FloatingMenuManager.start(applicationContext)
             }
-        }
-    }
-
-    private fun captureAndProcess(data: Intent) {
-        val metrics = resources.displayMetrics
-        val width = metrics.widthPixels
-        val height = metrics.heightPixels
-        val density = metrics.densityDpi
-
-        mediaProjection = projectionManager?.getMediaProjection(RESULT_OK, data)
-        if (mediaProjection == null) {
-            Toast.makeText(this, "Gagal mendapatkan MediaProjection", Toast.LENGTH_SHORT).show()
             finish()
-            return
         }
-
-        imageReader = ImageReader.newInstance(width, height, PixelFormat.RGBA_8888, 2)
-        virtualDisplay = mediaProjection?.createVirtualDisplay(
-            "ClestialScreenCrop",
-            width, height, density,
-            DisplayManager.VIRTUAL_DISPLAY_FLAG_AUTO_MIRROR,
-            imageReader!!.surface, null, null
-        )
-
-        Handler(Looper.getMainLooper()).postDelayed({
-            var croppedBitmap: Bitmap? = null
-            try {
-                val image = imageReader?.acquireLatestImage()
-                if (image != null) {
-                    val planes = image.planes
-                    val buffer = planes[0].buffer
-                    val pixelStride = planes[0].pixelStride
-                    val rowStride = planes[0].rowStride
-                    val rowPadding = rowStride - pixelStride * width
-
-                    val bitmap = Bitmap.createBitmap(
-                        width + rowPadding / pixelStride,
-                        height,
-                        Bitmap.Config.ARGB_8888
-                    )
-                    bitmap.copyPixelsFromBuffer(buffer)
-                    image.close()
-
-                    val safeX = cropX.coerceIn(0, width - 1)
-                    val safeY = cropY.coerceIn(0, height - 1)
-                    val safeW = cropW.coerceAtMost(width - safeX).coerceAtLeast(1)
-                    val safeH = cropH.coerceAtMost(height - safeY).coerceAtLeast(1)
-
-                    croppedBitmap = Bitmap.createBitmap(bitmap, safeX, safeY, safeW, safeH)
-                }
-            } catch (e: Exception) {
-                e.printStackTrace()
-            } finally {
-                virtualDisplay?.release()
-                mediaProjection?.stop()
-            }
-
-            if (croppedBitmap != null) {
-                runOcrAndOpenGoogle(croppedBitmap)
-            } else {
-                Toast.makeText(applicationContext, "Gagal mengambil area layar", Toast.LENGTH_SHORT).show()
-                finish()
-            }
-        }, 250)
-    }
-
-    private fun runOcrAndOpenGoogle(bitmap: Bitmap) {
-        val recognizer = TextRecognition.getClient(TextRecognizerOptions.DEFAULT_OPTIONS)
-        val inputImage = InputImage.fromBitmap(bitmap, 0)
-        recognizer.process(inputImage)
-            .addOnSuccessListener { visionText ->
-                val rawText = visionText.text.trim()
-                val prefs = Prefs(applicationContext)
-                val abcdQ = if (prefs.autoAnswerEnabled) AbcdSolver.parseFromText(rawText) else null
-
-                if (abcdQ != null) {
-                    Toast.makeText(applicationContext, "🎯 Soal ABCD terdeteksi! Memecahkan jawaban...", Toast.LENGTH_SHORT).show()
-                    AbcdSolver.solve(abcdQ, prefs) { solution ->
-                        val cm = getSystemService(Context.CLIPBOARD_SERVICE) as ClipboardManager
-                        val summary = if (solution.ok) {
-                            "🎯 Kunci: [${solution.selectedOption}] ${solution.optionText}\n" +
-                            "Sumber: ${solution.source}\n" +
-                            "Penjelasan: ${solution.explanation}"
-                        } else {
-                            "Error: ${solution.error ?: "Gagal memproses soal."}"
-                        }
-
-                        cm.setPrimaryClip(ClipData.newPlainText("Kunci Jawaban", summary))
-
-                        val service = AutoAnswerAccessibilityService.instance
-                        if (solution.ok && service != null && prefs.autoAnswerMode == Prefs.MODE_AUTO_CLICK) {
-                            service.triggerAutoAnswer { _, _ -> }
-                        }
-
-                        Toast.makeText(
-                            applicationContext,
-                            if (solution.ok) "🎯 Kunci: [${solution.selectedOption}] ${solution.optionText}" else "Gagal memecahkan soal ABCD",
-                            Toast.LENGTH_LONG
-                        ).show()
-
-                        FloatingMenuManager.showAutoAnswer(applicationContext, summary)
-                        finish()
-                    }
-                } else {
-                    val text = rawText.replace("\n", " ")
-                    if (text.isNotEmpty()) {
-                        Toast.makeText(applicationContext, "Soal terbaca: $text", Toast.LENGTH_SHORT).show()
-                        FloatingMenuManager.searchGoogle(applicationContext, text)
-                    } else {
-                        Toast.makeText(applicationContext, "Tidak ada teks/soal terbaca di dalam kotak", Toast.LENGTH_SHORT).show()
-                        FloatingMenuManager.searchGoogle(applicationContext, "")
-                    }
-                    finish()
-                }
-            }
-            .addOnFailureListener { e ->
-                Toast.makeText(applicationContext, "OCR Gagal: ${e.message}", Toast.LENGTH_SHORT).show()
-                FloatingMenuManager.searchGoogle(applicationContext, "")
-                finish()
-            }
     }
 }

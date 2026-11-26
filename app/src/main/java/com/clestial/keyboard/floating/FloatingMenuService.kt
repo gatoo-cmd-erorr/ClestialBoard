@@ -45,6 +45,7 @@ import com.clestial.keyboard.math.AiRouterClient
 import com.clestial.keyboard.math.FieldType
 import com.clestial.keyboard.math.MathModule
 import com.clestial.keyboard.math.MathRegistry
+import com.clestial.keyboard.math.OfflineMathAssistant
 import com.clestial.keyboard.math.ScientificCalculator
 import java.net.URLEncoder
 import kotlin.math.abs
@@ -138,6 +139,17 @@ class FloatingMenuService : Service() {
                 showPopup(tabIndex = 3)
                 if (!solText.isNullOrEmpty()) {
                     popupView?.findViewById<TextView>(R.id.tvAutoAnswerStatus)?.text = solText
+                }
+            }
+            FloatingMenuManager.ACTION_SHOW_AI_RESULT -> {
+                val qText = intent.getStringExtra(FloatingMenuManager.EXTRA_QUERY).orEmpty()
+                val ansText = intent.getStringExtra(FloatingMenuManager.EXTRA_SOLUTION).orEmpty()
+                hideDock()
+                hideSelectionBox()
+                showPopup(tabIndex = 0)
+                if (qText.isNotEmpty()) etAiQuestionRef?.setText(qText)
+                if (ansText.isNotEmpty()) {
+                    popupView?.findViewById<TextView>(R.id.tvAiResponse)?.text = ansText
                 }
             }
             else -> {
@@ -491,14 +503,26 @@ class FloatingMenuService : Service() {
 
             hideSelectionBox()
 
-            val captureIntent = Intent(this, ScreenCaptureActivity::class.java).apply {
-                flags = Intent.FLAG_ACTIVITY_NEW_TASK
-                putExtra(ScreenCaptureActivity.EXTRA_CROP_X, cropX)
-                putExtra(ScreenCaptureActivity.EXTRA_CROP_Y, cropY)
-                putExtra(ScreenCaptureActivity.EXTRA_CROP_W, cropW)
-                putExtra(ScreenCaptureActivity.EXTRA_CROP_H, cropH)
+            fun launchMediaProjection() {
+                val captureIntent = Intent(this, ScreenCaptureActivity::class.java).apply {
+                    flags = Intent.FLAG_ACTIVITY_NEW_TASK
+                    putExtra(ScreenCaptureActivity.EXTRA_CROP_X, cropX)
+                    putExtra(ScreenCaptureActivity.EXTRA_CROP_Y, cropY)
+                    putExtra(ScreenCaptureActivity.EXTRA_CROP_W, cropW)
+                    putExtra(ScreenCaptureActivity.EXTRA_CROP_H, cropH)
+                }
+                startActivity(captureIntent)
             }
-            startActivity(captureIntent)
+
+            // Jika layanan aksesibilitas aktif di Android 11+, tangkap layar senyap tanpa dialog "Bagikan layar"!
+            val accService = AutoAnswerAccessibilityService.instance
+            if (accService != null && Build.VERSION.SDK_INT >= Build.VERSION_CODES.R) {
+                accService.captureRegionSilent(cropX, cropY, cropW, cropH) {
+                    mainHandler.post { launchMediaProjection() }
+                }
+            } else {
+                launchMediaProjection()
+            }
         }
 
         selectionBoxView = boxRoot
@@ -657,15 +681,63 @@ class FloatingMenuService : Service() {
         tabAutoAnswer.setOnClickListener { selectTab(3) }
         selectTab(0)
 
-        // --- Tab 1: AI (ChatGPT)
+        // --- Tab 1: AI (ChatGPT + Offline Math Fallback)
         val etAi = popup.findViewById<EditText>(R.id.etAiQuestion)
         val tvAiResponse = popup.findViewById<TextView>(R.id.tvAiResponse)
         val btnAiPaste = popup.findViewById<Button>(R.id.btnAiPaste)
         val btnAiClear = popup.findViewById<Button>(R.id.btnAiClear)
+        val btnAiKeyToggle = popup.findViewById<Button>(R.id.btnAiKeyToggle)
+        val panelAiKeyConfig = popup.findViewById<View>(R.id.panelAiKeyConfig)
+        val etAiApiKey = popup.findViewById<EditText>(R.id.etAiApiKey)
+        val btnAiSaveKey = popup.findViewById<Button>(R.id.btnAiSaveKey)
         val btnAiSubmit = popup.findViewById<Button>(R.id.btnAiSubmit)
         val btnAiCopy = popup.findViewById<Button>(R.id.btnAiCopy)
         etAiQuestionRef = etAi
         enableOverlayTyping(etAi)
+        enableOverlayTyping(etAiApiKey)
+
+        if (prefs.chatGptApiKey.isNotEmpty()) {
+            etAiApiKey.setText(prefs.chatGptApiKey)
+        }
+
+        btnAiKeyToggle.setOnClickListener {
+            panelAiKeyConfig.visibility = if (panelAiKeyConfig.visibility == View.VISIBLE) View.GONE else View.VISIBLE
+        }
+
+        btnAiSaveKey.setOnClickListener {
+            val rawKey = etAiApiKey.text.toString().trim()
+            if (rawKey.isEmpty()) {
+                prefs.chatGptApiKey = ""
+                Toast.makeText(this, "API Key dihapus (mode offline aktif)", Toast.LENGTH_SHORT).show()
+                panelAiKeyConfig.visibility = View.GONE
+                return@setOnClickListener
+            }
+            when {
+                rawKey.startsWith("http://") || rawKey.startsWith("https://") -> {
+                    prefs.aiProxyUrl = rawKey
+                    Toast.makeText(this, "URL Proxy AI disimpan!", Toast.LENGTH_SHORT).show()
+                }
+                rawKey.startsWith("gsk_") -> {
+                    prefs.chatGptApiKey = rawKey
+                    prefs.chatGptEndpoint = "https://api.groq.com/openai/v1/chat/completions"
+                    prefs.chatGptModel = "llama-3.3-70b-versatile"
+                    Toast.makeText(this, "Groq API Key tersimpan!", Toast.LENGTH_SHORT).show()
+                }
+                rawKey.startsWith("sk-or-") -> {
+                    prefs.chatGptApiKey = rawKey
+                    prefs.chatGptEndpoint = "https://openrouter.ai/api/v1/chat/completions"
+                    prefs.chatGptModel = "openai/gpt-4o-mini"
+                    Toast.makeText(this, "OpenRouter API Key tersimpan!", Toast.LENGTH_SHORT).show()
+                }
+                else -> {
+                    prefs.chatGptApiKey = rawKey
+                    prefs.chatGptEndpoint = Prefs.DEFAULT_CHATGPT_ENDPOINT
+                    prefs.chatGptModel = Prefs.DEFAULT_CHATGPT_MODEL
+                    Toast.makeText(this, "OpenAI API Key tersimpan!", Toast.LENGTH_SHORT).show()
+                }
+            }
+            panelAiKeyConfig.visibility = View.GONE
+        }
 
         val cm = getSystemService(Context.CLIPBOARD_SERVICE) as ClipboardManager
 
@@ -681,7 +753,7 @@ class FloatingMenuService : Service() {
 
         btnAiClear.setOnClickListener {
             etAi.setText("")
-            tvAiResponse.text = "Hasil jawaban AI akan muncul di sini..."
+            tvAiResponse.text = "Hasil jawaban AI akan muncul di sini…"
         }
 
         btnAiSubmit.setOnClickListener {
@@ -690,6 +762,29 @@ class FloatingMenuService : Service() {
                 Toast.makeText(this, "Tulis atau tempel pertanyaan terlebih dahulu", Toast.LENGTH_SHORT).show()
                 return@setOnClickListener
             }
+
+            val hasApiKey = prefs.chatGptApiKey.isNotBlank()
+            val hasCustomProxy = prefs.aiProxyUrl.isNotBlank() && !prefs.aiProxyUrl.contains("10.0.2.2")
+
+            if (!hasApiKey && !hasCustomProxy) {
+                // Mode Offline Pintar: coba pecahkan soal ABCD atau matematika (SPLDV, PLSV, Kuadrat, Kalkulator/Kombinasi)
+                val abcd = AbcdSolver.parseFromText(q)
+                if (abcd != null) {
+                    val sol = AbcdSolver.solveLocally(abcd)
+                    tvAiResponse.text = "🎯 Kunci: [${sol.selectedOption}] ${sol.optionText}\nSumber: ${sol.source}\nPenjelasan: ${sol.explanation}"
+                    return@setOnClickListener
+                }
+                val offlineMath = OfflineMathAssistant.trySolveMathQuestion(q)
+                if (offlineMath != null) {
+                    tvAiResponse.text = offlineMath
+                    return@setOnClickListener
+                }
+                tvAiResponse.text = "Belum ada API Key AI yang diisi.\n\n" +
+                    "• Untuk soal Matematika (SPLDV, PLSV, Kuadrat, 5C2, 5!), ketik persamaannya langsung di sini atau buka tab ∑ Kalkulator.\n" +
+                    "• Untuk pertanyaan umum / esai, ketuk tombol '🔑 Key' di atas dan tempel API Key OpenAI (sk-...), Groq gratis (gsk_...), atau OpenRouter (sk-or-...)."
+                return@setOnClickListener
+            }
+
             tvAiResponse.text = "Sedang memproses dengan AI..."
             btnAiSubmit.isEnabled = false
 
@@ -699,7 +794,12 @@ class FloatingMenuService : Service() {
                     if (res.ok) {
                         tvAiResponse.text = res.text
                     } else {
-                        tvAiResponse.text = "Error: ${res.error ?: "Gagal memproses"}"
+                        val offlineFallback = OfflineMathAssistant.trySolveMathQuestion(q)
+                        if (offlineFallback != null) {
+                            tvAiResponse.text = "$offlineFallback\n\n(AI offline/error: ${res.error})"
+                        } else {
+                            tvAiResponse.text = "Error: ${res.error ?: "Gagal memproses"}"
+                        }
                     }
                 }
             }

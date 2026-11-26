@@ -162,8 +162,20 @@
                     android:layout_marginStart="6dp"
                     android:background="@drawable/bg_floating_pill"
                     android:paddingHorizontal="10dp"
-                    android:text="Bersihkan"
+                    android:text="Hapus"
                     android:textColor="#94A3B8"
+                    android:textSize="11sp" />
+
+                <Button
+                    android:id="@+id/btnAiKeyToggle"
+                    style="?android:attr/borderlessButtonStyle"
+                    android:layout_width="wrap_content"
+                    android:layout_height="match_parent"
+                    android:layout_marginStart="6dp"
+                    android:background="@drawable/bg_floating_pill"
+                    android:paddingHorizontal="10dp"
+                    android:text="🔑 Key"
+                    android:textColor="#38BDF8"
                     android:textSize="11sp" />
 
                 <View
@@ -176,10 +188,48 @@
                     android:layout_width="wrap_content"
                     android:layout_height="match_parent"
                     android:background="@drawable/bg_floating_btn"
-                    android:paddingHorizontal="16dp"
+                    android:paddingHorizontal="14dp"
                     android:text="Tanya AI"
                     android:textColor="#FFFFFF"
                     android:textSize="12sp"
+                    android:textStyle="bold" />
+            </LinearLayout>
+
+            <!-- Panel Pengaturan API Key Inline -->
+            <LinearLayout
+                android:id="@+id/panelAiKeyConfig"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:layout_marginTop="6dp"
+                android:background="@drawable/bg_floating_card"
+                android:orientation="horizontal"
+                android:padding="6dp"
+                android:visibility="gone">
+
+                <EditText
+                    android:id="@+id/etAiApiKey"
+                    android:layout_width="0dp"
+                    android:layout_height="36dp"
+                    android:layout_weight="1"
+                    android:background="@drawable/bg_floating_input"
+                    android:hint="Tempel sk-... / gsk_... / URL proxy"
+                    android:inputType="textNoSuggestions"
+                    android:maxLines="1"
+                    android:paddingHorizontal="8dp"
+                    android:textColor="#F8FAFC"
+                    android:textColorHint="#64748B"
+                    android:textSize="11.5sp" />
+
+                <Button
+                    android:id="@+id/btnAiSaveKey"
+                    android:layout_width="wrap_content"
+                    android:layout_height="36dp"
+                    android:layout_marginStart="6dp"
+                    android:background="@drawable/bg_floating_btn"
+                    android:paddingHorizontal="12dp"
+                    android:text="Simpan"
+                    android:textColor="#FFFFFF"
+                    android:textSize="11.5sp"
                     android:textStyle="bold" />
             </LinearLayout>
 
