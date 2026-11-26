@@ -4,6 +4,7 @@
     android:layout_width="match_parent"
     android:layout_height="wrap_content"
     android:background="@drawable/bg_floating_popup"
+    android:elevation="12dp"
     android:orientation="vertical"
     android:padding="12dp">
 
@@ -21,16 +22,16 @@
             android:layout_height="wrap_content"
             android:layout_weight="1"
             android:text="Asisten Cepat (2x ketuk tutup)"
-            android:textColor="#E2E8F0"
+            android:textColor="#F8FAFC"
             android:textSize="13sp"
             android:textStyle="bold" />
 
         <TextView
             android:layout_width="wrap_content"
             android:layout_height="wrap_content"
-            android:background="@drawable/bg_pill"
-            android:paddingHorizontal="6dp"
-            android:paddingVertical="2dp"
+            android:background="@drawable/bg_floating_pill"
+            android:paddingHorizontal="8dp"
+            android:paddingVertical="3dp"
             android:text="Anti Detek"
             android:textColor="#94A3B8"
             android:textSize="10sp" />
@@ -58,13 +59,13 @@
             android:id="@+id/tabAi"
             android:layout_width="0dp"
             android:layout_height="match_parent"
-            android:layout_marginEnd="4dp"
+            android:layout_marginEnd="3dp"
             android:layout_weight="1"
             android:background="@drawable/bg_floating_tab"
             android:gravity="center"
             android:text="✨ Tanya AI"
-            android:textColor="#FFFFFF"
-            android:textSize="12sp"
+            android:textColor="#F8FAFC"
+            android:textSize="11.5sp"
             android:textStyle="bold" />
 
         <TextView
@@ -75,22 +76,21 @@
             android:layout_weight="1"
             android:background="@drawable/bg_floating_tab"
             android:gravity="center"
-            android:text="🔍 Google Web"
-            android:textColor="#FFFFFF"
-            android:textSize="12sp"
+            android:text="🔍 Google"
+            android:textColor="#F8FAFC"
+            android:textSize="11.5sp"
             android:textStyle="bold" />
 
         <TextView
             android:id="@+id/tabMath"
             android:layout_width="0dp"
             android:layout_height="match_parent"
-            android:layout_marginStart="2dp"
-            android:layout_marginEnd="2dp"
-            android:layout_weight="1"
+            android:layout_marginHorizontal="2dp"
+            android:layout_weight="1.15"
             android:background="@drawable/bg_floating_tab"
             android:gravity="center"
-            android:text="∑ SMP 9"
-            android:textColor="#FFFFFF"
+            android:text="∑ Kalkulator"
+            android:textColor="#F8FAFC"
             android:textSize="11.5sp"
             android:textStyle="bold" />
 
@@ -98,12 +98,12 @@
             android:id="@+id/tabAutoAnswer"
             android:layout_width="0dp"
             android:layout_height="match_parent"
-            android:layout_marginStart="2dp"
-            android:layout_weight="1.1"
+            android:layout_marginStart="3dp"
+            android:layout_weight="1.05"
             android:background="@drawable/bg_floating_tab"
             android:gravity="center"
             android:text="🎯 Auto ABCD"
-            android:textColor="#FFFFFF"
+            android:textColor="#F8FAFC"
             android:textSize="11sp"
             android:textStyle="bold" />
     </LinearLayout>
@@ -127,19 +127,19 @@
                 android:id="@+id/etAiQuestion"
                 android:layout_width="match_parent"
                 android:layout_height="wrap_content"
-                android:background="@drawable/bg_input"
+                android:background="@drawable/bg_floating_input"
                 android:hint="Tulis pertanyaan atau soal cerita…"
                 android:inputType="textMultiLine"
                 android:maxLines="3"
                 android:minLines="2"
-                android:padding="8dp"
-                android:textColor="#FFFFFF"
+                android:padding="10dp"
+                android:textColor="#F8FAFC"
                 android:textColorHint="#94A3B8"
                 android:textSize="13sp" />
 
             <LinearLayout
                 android:layout_width="match_parent"
-                android:layout_height="32dp"
+                android:layout_height="34dp"
                 android:layout_marginTop="6dp"
                 android:orientation="horizontal">
 
@@ -148,7 +148,7 @@
                     style="?android:attr/borderlessButtonStyle"
                     android:layout_width="wrap_content"
                     android:layout_height="match_parent"
-                    android:background="@drawable/bg_pill"
+                    android:background="@drawable/bg_floating_pill"
                     android:paddingHorizontal="10dp"
                     android:text="📋 Tempel"
                     android:textColor="#E2E8F0"
@@ -160,7 +160,7 @@
                     android:layout_width="wrap_content"
                     android:layout_height="match_parent"
                     android:layout_marginStart="6dp"
-                    android:background="@drawable/bg_pill"
+                    android:background="@drawable/bg_floating_pill"
                     android:paddingHorizontal="10dp"
                     android:text="Bersihkan"
                     android:textColor="#94A3B8"
@@ -175,8 +175,8 @@
                     android:id="@+id/btnAiSubmit"
                     android:layout_width="wrap_content"
                     android:layout_height="match_parent"
-                    android:background="@drawable/bg_btn"
-                    android:paddingHorizontal="14dp"
+                    android:background="@drawable/bg_floating_btn"
+                    android:paddingHorizontal="16dp"
                     android:text="Tanya AI"
                     android:textColor="#FFFFFF"
                     android:textSize="12sp"
@@ -187,8 +187,8 @@
                 android:layout_width="match_parent"
                 android:layout_height="120dp"
                 android:layout_marginTop="8dp"
-                android:background="@drawable/bg_card"
-                android:padding="8dp">
+                android:background="@drawable/bg_floating_card"
+                android:padding="10dp">
 
                 <TextView
                     android:id="@+id/tvAiResponse"
@@ -196,7 +196,7 @@
                     android:layout_height="wrap_content"
                     android:text="Hasil jawaban AI akan muncul di sini…"
                     android:textColor="#F1F5F9"
-                    android:textSize="12sp" />
+                    android:textSize="12.5sp" />
             </ScrollView>
 
             <Button
@@ -205,7 +205,7 @@
                 android:layout_width="match_parent"
                 android:layout_height="34dp"
                 android:layout_marginTop="6dp"
-                android:background="@drawable/bg_pill"
+                android:background="@drawable/bg_floating_pill"
                 android:text="📋 Salin Jawaban AI"
                 android:textColor="#38BDF8"
                 android:textSize="12sp"
@@ -222,7 +222,7 @@
 
             <LinearLayout
                 android:layout_width="match_parent"
-                android:layout_height="36dp"
+                android:layout_height="38dp"
                 android:orientation="horizontal">
 
                 <EditText
@@ -230,26 +230,27 @@
                     android:layout_width="0dp"
                     android:layout_height="match_parent"
                     android:layout_weight="1"
-                    android:background="@drawable/bg_input"
+                    android:background="@drawable/bg_floating_input"
                     android:hint="Cari Google…"
                     android:imeOptions="actionSearch"
                     android:inputType="text"
                     android:maxLines="1"
-                    android:paddingHorizontal="8dp"
-                    android:textColor="#FFFFFF"
+                    android:paddingHorizontal="10dp"
+                    android:textColor="#F8FAFC"
                     android:textColorHint="#94A3B8"
-                    android:textSize="12sp" />
+                    android:textSize="12.5sp" />
 
                 <Button
                     android:id="@+id/btnGoogleSearch"
                     android:layout_width="wrap_content"
                     android:layout_height="match_parent"
                     android:layout_marginStart="6dp"
-                    android:background="@drawable/bg_btn"
-                    android:paddingHorizontal="12dp"
+                    android:background="@drawable/bg_floating_btn"
+                    android:paddingHorizontal="14dp"
                     android:text="Cari"
                     android:textColor="#FFFFFF"
-                    android:textSize="12sp" />
+                    android:textSize="12sp"
+                    android:textStyle="bold" />
             </LinearLayout>
 
             <!-- Navigasi mini webview -->
@@ -286,7 +287,7 @@
                     android:ellipsize="end"
                     android:maxLines="1"
                     android:text="https://www.google.com"
-                    android:textColor="#64748B"
+                    android:textColor="#94A3B8"
                     android:textSize="10sp" />
             </LinearLayout>
 
@@ -295,10 +296,10 @@
                 android:layout_width="match_parent"
                 android:layout_height="220dp"
                 android:layout_marginTop="4dp"
-                android:background="#1E293B" />
+                android:background="#0B1120" />
         </LinearLayout>
 
-        <!-- Tab 3: SMP 9 Math Quick Solver -->
+        <!-- Tab 3: Kalkulator Umum/Kombinasi & SMP 9 Math Solver -->
         <LinearLayout
             android:id="@+id/panelMath"
             android:layout_width="match_parent"
@@ -308,13 +309,14 @@
 
             <HorizontalScrollView
                 android:layout_width="match_parent"
-                android:layout_height="32dp"
+                android:layout_height="34dp"
                 android:scrollbars="none">
 
                 <LinearLayout
                     android:id="@+id/mathChipsRow"
                     android:layout_width="wrap_content"
                     android:layout_height="match_parent"
+                    android:gravity="center_vertical"
                     android:orientation="horizontal" />
             </HorizontalScrollView>
 
@@ -322,55 +324,77 @@
                 android:id="@+id/tvFloatingMathDesc"
                 android:layout_width="match_parent"
                 android:layout_height="wrap_content"
-                android:layout_marginTop="4dp"
-                android:text="Pilih materi untuk menghitung eksak:"
-                android:textColor="#94A3B8"
-                android:textSize="11sp" />
+                android:layout_marginTop="6dp"
+                android:text="Pilih mode kalkulator atau materi SMP 9:"
+                android:textColor="#CBD5E1"
+                android:textSize="11.5sp" />
 
-            <LinearLayout
-                android:id="@+id/mathFieldsContainer"
+            <ScrollView
                 android:layout_width="match_parent"
                 android:layout_height="wrap_content"
                 android:layout_marginTop="4dp"
-                android:orientation="vertical" />
+                android:fillViewport="true"
+                android:scrollbars="vertical">
+
+                <LinearLayout
+                    android:id="@+id/mathFieldsContainer"
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:orientation="vertical" />
+            </ScrollView>
+
+            <!-- Bilah Keypad Cepat (bisa diklik langsung tanpa harus menunggu keyboard sistem) -->
+            <HorizontalScrollView
+                android:layout_width="match_parent"
+                android:layout_height="34dp"
+                android:layout_marginTop="6dp"
+                android:scrollbars="none">
+
+                <LinearLayout
+                    android:id="@+id/mathQuickKeypadRow"
+                    android:layout_width="wrap_content"
+                    android:layout_height="match_parent"
+                    android:gravity="center_vertical"
+                    android:orientation="horizontal" />
+            </HorizontalScrollView>
 
             <Button
                 android:id="@+id/btnFloatingMathSolve"
                 android:layout_width="match_parent"
-                android:layout_height="36dp"
+                android:layout_height="38dp"
                 android:layout_marginTop="6dp"
-                android:background="@drawable/bg_btn"
+                android:background="@drawable/bg_floating_btn"
                 android:text="Hitung Solusi Eksak"
                 android:textColor="#FFFFFF"
-                android:textSize="12sp"
+                android:textSize="12.5sp"
                 android:textStyle="bold" />
 
             <ScrollView
                 android:layout_width="match_parent"
-                android:layout_height="100dp"
+                android:layout_height="115dp"
                 android:layout_marginTop="6dp"
-                android:background="@drawable/bg_card"
-                android:padding="8dp">
+                android:background="@drawable/bg_floating_card"
+                android:padding="10dp">
 
                 <TextView
                     android:id="@+id/tvFloatingMathResult"
                     android:layout_width="match_parent"
                     android:layout_height="wrap_content"
                     android:text="Jawaban dan langkah eksak akan tampil di sini…"
-                    android:textColor="#F1F5F9"
-                    android:textSize="11.5sp" />
+                    android:textColor="#F8FAFC"
+                    android:textSize="12sp" />
             </ScrollView>
 
             <Button
                 android:id="@+id/btnFloatingMathCopy"
                 style="?android:attr/borderlessButtonStyle"
                 android:layout_width="match_parent"
-                android:layout_height="32dp"
-                android:layout_marginTop="4dp"
-                android:background="@drawable/bg_pill"
+                android:layout_height="34dp"
+                android:layout_marginTop="6dp"
+                android:background="@drawable/bg_floating_pill"
                 android:text="📋 Salin Jawaban &amp; Langkah"
                 android:textColor="#38BDF8"
-                android:textSize="11sp"
+                android:textSize="11.5sp"
                 android:textStyle="bold" />
         </LinearLayout>
 
@@ -386,7 +410,7 @@
             <LinearLayout
                 android:layout_width="match_parent"
                 android:layout_height="wrap_content"
-                android:background="@drawable/bg_card"
+                android:background="@drawable/bg_floating_card"
                 android:gravity="center_vertical"
                 android:orientation="horizontal"
                 android:padding="8dp">
@@ -406,17 +430,18 @@
                     style="?android:attr/borderlessButtonStyle"
                     android:layout_width="wrap_content"
                     android:layout_height="28dp"
-                    android:background="@drawable/bg_pill"
+                    android:background="@drawable/bg_floating_pill"
                     android:paddingHorizontal="8dp"
                     android:text="Aktifkan Izin"
                     android:textColor="#38BDF8"
-                    android:textSize="10.5sp" />
+                    android:textSize="10.5sp"
+                    android:textStyle="bold" />
             </LinearLayout>
 
-            <!-- Switch Auto Jawab ABCD Aktif -->
+            <!-- Toggle Aktifkan Fitur Auto-Jawab -->
             <LinearLayout
                 android:layout_width="match_parent"
-                android:layout_height="36dp"
+                android:layout_height="34dp"
                 android:layout_marginTop="6dp"
                 android:gravity="center_vertical"
                 android:orientation="horizontal">
@@ -425,16 +450,15 @@
                     android:layout_width="0dp"
                     android:layout_height="wrap_content"
                     android:layout_weight="1"
-                    android:text="Fitur Auto-Jawab ABCD"
-                    android:textColor="#E2E8F0"
+                    android:text="Otomatis Jawab Soal Baru di Layar"
+                    android:textColor="#F8FAFC"
                     android:textSize="12sp"
                     android:textStyle="bold" />
 
                 <androidx.appcompat.widget.SwitchCompat
                     android:id="@+id/switchAutoAnswerEnabled"
                     android:layout_width="wrap_content"
-                    android:layout_height="wrap_content"
-                    android:checked="true" />
+                    android:layout_height="wrap_content" />
             </LinearLayout>
 
             <!-- Pilihan Mode: Auto-Klik vs Kunci Saja -->
@@ -451,7 +475,7 @@
                     android:layout_height="match_parent"
                     android:layout_marginEnd="4dp"
                     android:layout_weight="1"
-                    android:background="@drawable/bg_pill_on"
+                    android:background="@drawable/bg_floating_pill_on"
                     android:text="Auto-Klik Layar"
                     android:textColor="#FFFFFF"
                     android:textSize="11sp"
@@ -463,9 +487,9 @@
                     android:layout_width="0dp"
                     android:layout_height="match_parent"
                     android:layout_weight="1"
-                    android:background="@drawable/bg_pill"
+                    android:background="@drawable/bg_floating_pill"
                     android:text="Kunci &amp; Salin Saja"
-                    android:textColor="#94A3B8"
+                    android:textColor="#CBD5E1"
                     android:textSize="11sp" />
             </LinearLayout>
 
@@ -481,7 +505,7 @@
                     android:layout_width="wrap_content"
                     android:layout_height="wrap_content"
                     android:text="Jeda Klik:"
-                    android:textColor="#94A3B8"
+                    android:textColor="#CBD5E1"
                     android:textSize="11sp" />
 
                 <Button
@@ -490,10 +514,10 @@
                     android:layout_width="wrap_content"
                     android:layout_height="26dp"
                     android:layout_marginStart="6dp"
-                    android:background="@drawable/bg_pill"
+                    android:background="@drawable/bg_floating_pill"
                     android:paddingHorizontal="6dp"
                     android:text="0s"
-                    android:textColor="#94A3B8"
+                    android:textColor="#CBD5E1"
                     android:textSize="10sp" />
 
                 <Button
@@ -502,7 +526,7 @@
                     android:layout_width="wrap_content"
                     android:layout_height="26dp"
                     android:layout_marginStart="4dp"
-                    android:background="@drawable/bg_pill_on"
+                    android:background="@drawable/bg_floating_pill_on"
                     android:paddingHorizontal="6dp"
                     android:text="1.5s"
                     android:textColor="#FFFFFF"
@@ -514,10 +538,10 @@
                     android:layout_width="wrap_content"
                     android:layout_height="26dp"
                     android:layout_marginStart="4dp"
-                    android:background="@drawable/bg_pill"
+                    android:background="@drawable/bg_floating_pill"
                     android:paddingHorizontal="6dp"
                     android:text="2s"
-                    android:textColor="#94A3B8"
+                    android:textColor="#CBD5E1"
                     android:textSize="10sp" />
 
                 <Button
@@ -526,10 +550,10 @@
                     android:layout_width="wrap_content"
                     android:layout_height="26dp"
                     android:layout_marginStart="4dp"
-                    android:background="@drawable/bg_pill"
+                    android:background="@drawable/bg_floating_pill"
                     android:paddingHorizontal="6dp"
                     android:text="3s"
-                    android:textColor="#94A3B8"
+                    android:textColor="#CBD5E1"
                     android:textSize="10sp" />
 
                 <TextView
@@ -538,7 +562,7 @@
                     android:layout_weight="1"
                     android:gravity="end"
                     android:text="(Anti-Detek)"
-                    android:textColor="#64748B"
+                    android:textColor="#94A3B8"
                     android:textSize="10sp" />
             </LinearLayout>
 
@@ -546,9 +570,9 @@
             <Button
                 android:id="@+id/btnTriggerScreenAnswer"
                 android:layout_width="match_parent"
-                android:layout_height="36dp"
+                android:layout_height="38dp"
                 android:layout_marginTop="8dp"
-                android:background="@drawable/bg_btn"
+                android:background="@drawable/bg_floating_btn"
                 android:text="⚡ Pindai &amp; Jawab Soal di Layar Sekarang"
                 android:textColor="#FFFFFF"
                 android:textSize="12sp"
@@ -559,15 +583,15 @@
                 android:layout_width="match_parent"
                 android:layout_height="90dp"
                 android:layout_marginTop="6dp"
-                android:background="@drawable/bg_card"
-                android:padding="8dp">
+                android:background="@drawable/bg_floating_card"
+                android:padding="10dp">
 
                 <TextView
                     android:id="@+id/tvAutoAnswerStatus"
                     android:layout_width="match_parent"
                     android:layout_height="wrap_content"
                     android:text="Status: Siap mendeteksi soal ABCD di aplikasi kuis/ujian."
-                    android:textColor="#CBD5E1"
+                    android:textColor="#E2E8F0"
                     android:textSize="11.5sp" />
             </ScrollView>
 
@@ -575,12 +599,13 @@
                 android:id="@+id/btnCopyAutoAnswer"
                 style="?android:attr/borderlessButtonStyle"
                 android:layout_width="match_parent"
-                android:layout_height="30dp"
-                android:layout_marginTop="4dp"
-                android:background="@drawable/bg_pill"
+                android:layout_height="32dp"
+                android:layout_marginTop="6dp"
+                android:background="@drawable/bg_floating_pill"
                 android:text="📋 Salin Kunci &amp; Penjelasan"
                 android:textColor="#38BDF8"
-                android:textSize="11sp" />
+                android:textSize="11.5sp"
+                android:textStyle="bold" />
         </LinearLayout>
 
     </FrameLayout>

@@ -1,5 +1,7 @@
 package com.clestial.keyboard.math
 
+import java.math.BigInteger
+
 /**
  * Modul 9 (Peluang):
  * - Peluang kejadian P(A) = n(A)/n(S) dan komplemen P(A') = 1 - P(A)
@@ -9,20 +11,29 @@ package com.clestial.keyboard.math
 class ProbabilityModule : MathModule {
 
     override val id = "peluang"
-    override val name = "Peluang & Frekuensi Harapan"
+    override val name = "Peluang, Kombinasi & Permutasi"
     override val group = MathGroup.STATISTIKA_PELUANG
-    override val description = "Hitung P(A), komplemen, ruang sampel dadu/koin, dan frekuensi harapan."
+    override val description = "Hitung P(A), komplemen, dadu/koin, frekuensi harapan, Kombinasi C(n,r), Permutasi P(n,r), dan n!."
 
     override val fields = listOf(
         InputFieldSpec(
             key = "mode",
             label = "Sub-fitur",
             type = FieldType.CHOICE,
-            choices = listOf(MODE_DASAR, MODE_DADU_1, MODE_DADU_2, MODE_KOIN, MODE_FH),
+            choices = listOf(
+                MODE_DASAR,
+                MODE_KOMBINASI,
+                MODE_PERMUTASI,
+                MODE_FAKTORIAL,
+                MODE_DADU_1,
+                MODE_DADU_2,
+                MODE_KOIN,
+                MODE_FH
+            ),
             defaultValue = MODE_DASAR
         ),
-        InputFieldSpec("a", "n(A) / P(A) / jumlah koin (1-3)", "1", required = false),
-        InputFieldSpec("b", "n(S) / banyak percobaan N / target angka k", "6", required = false),
+        InputFieldSpec("a", "n(A) / P(A) / jumlah koin / nilai n", "5", required = false),
+        InputFieldSpec("b", "n(S) / percobaan N / target k / nilai r", "2", required = false),
         InputFieldSpec(
             key = "kejadian",
             label = "Jenis kejadian (untuk dadu/koin)",
@@ -38,6 +49,9 @@ class ProbabilityModule : MathModule {
         val mode = input["mode"]?.trim().orEmpty().ifEmpty { MODE_DASAR }
         return when (mode) {
             MODE_DASAR -> solveBasic(input)
+            MODE_KOMBINASI -> solveCombination(input)
+            MODE_PERMUTASI -> solvePermutation(input)
+            MODE_FAKTORIAL -> solveFactorial(input)
             MODE_DADU_1 -> solveDice(1, input)
             MODE_DADU_2 -> solveDice(2, input)
             MODE_KOIN -> solveCoins(input)
@@ -229,8 +243,118 @@ class ProbabilityModule : MathModule {
         )
     }
 
+    private fun factorialBig(n: Int): BigInteger {
+        var res = BigInteger.ONE
+        for (i in 2..n) res = res.multiply(BigInteger.valueOf(i.toLong()))
+        return res
+    }
+
+    private fun solveCombination(input: Map<String, String>): SolveResult {
+        val (n, en) = InputChecks.requireInt(input, "a", "Nilai n", min = 0, max = 500)
+        if (en != null) return SolveResult.fail(en)
+        val (r, er) = InputChecks.requireInt(input, "b", "Nilai r", min = 0, max = 500)
+        if (er != null) return SolveResult.fail(er)
+        n!!; r!!
+        if (r > n) return SolveResult.fail("Nilai r ($r) tidak boleh lebih besar dari n ($n) pada kombinasi C(n, r).")
+
+        val k = minOf(r, n - r)
+        var res = BigInteger.ONE
+        for (i in 1..k) {
+            res = res.multiply(BigInteger.valueOf((n - k + i).toLong()))
+                .divide(BigInteger.valueOf(i.toLong()))
+        }
+
+        val steps = ArrayList<String>()
+        steps.add("Rumus kombinasi (urutan tidak diperhatikan): C(n, r) = n! / (r! × (n - r)!)")
+        steps.add("C($n, $r) = $n! / ($r! × ${n - r}!)")
+        if (k > 0) {
+            val topTerms = (n downTo (n - k + 1)).joinToString(" × ")
+            val botTerms = (k downTo 1).joinToString(" × ")
+            steps.add("Sederhanakan faktorial: ($topTerms) / ($botTerms) = $res")
+        } else {
+            steps.add("Karena r = $r dan n - r = ${n - r}, nilai C($n, $r) = 1")
+        }
+
+        val pEquiv = if (k in 1..12) {
+            val rFact = factorialBig(r)
+            "C($n, $r) × $r! = $res × $rFact = ${res.multiply(rFact)} = P($n, $r)."
+        } else {
+            "Sifat simetri: C($n, $r) = C($n, ${n - r}) = $res."
+        }
+
+        return SolveResult(
+            ok = true,
+            steps = steps,
+            answer = "C($n, $r) = $res",
+            check = pEquiv
+        )
+    }
+
+    private fun solvePermutation(input: Map<String, String>): SolveResult {
+        val (n, en) = InputChecks.requireInt(input, "a", "Nilai n", min = 0, max = 500)
+        if (en != null) return SolveResult.fail(en)
+        val (r, er) = InputChecks.requireInt(input, "b", "Nilai r", min = 0, max = 500)
+        if (er != null) return SolveResult.fail(er)
+        n!!; r!!
+        if (r > n) return SolveResult.fail("Nilai r ($r) tidak boleh lebih besar dari n ($n) pada permutasi P(n, r).")
+
+        var res = BigInteger.ONE
+        for (i in 0 until r) {
+            res = res.multiply(BigInteger.valueOf((n - i).toLong()))
+        }
+
+        val steps = ArrayList<String>()
+        steps.add("Rumus permutasi (urutan diperhatikan): P(n, r) = n! / (n - r)!")
+        steps.add("P($n, $r) = $n! / ${n - r}!")
+        if (r > 0) {
+            val terms = (n downTo (n - r + 1)).joinToString(" × ")
+            steps.add("Jabarkan dan sederhanakan: $terms = $res")
+        } else {
+            steps.add("Karena r = 0, P($n, 0) = 1")
+        }
+
+        val rFact = if (r <= 20) factorialBig(r) else null
+        val checkMsg = if (rFact != null) {
+            "Cek hubungan dengan kombinasi: P($n, $r) / $r! = $res / $rFact = ${res.divide(rFact)} = C($n, $r)."
+        } else {
+            "Terdapat $res susunan berbeda."
+        }
+
+        return SolveResult(
+            ok = true,
+            steps = steps,
+            answer = "P($n, $r) = $res",
+            check = checkMsg
+        )
+    }
+
+    private fun solveFactorial(input: Map<String, String>): SolveResult {
+        val (n, en) = InputChecks.requireInt(input, "a", "Nilai n", min = 0, max = 500)
+        if (en != null) return SolveResult.fail(en)
+        n!!
+        val res = factorialBig(n)
+        val steps = ArrayList<String>()
+        steps.add("Definisi faktorial: n! = n × (n - 1) × ... × 1, dengan 0! = 1")
+        if (n <= 1) {
+            steps.add("$n! = 1")
+        } else if (n <= 10) {
+            steps.add("$n! = ${(n downTo 1).joinToString(" × ")} = $res")
+        } else {
+            steps.add("$n! = $n × ${n - 1} × ... × 2 × 1 = $res")
+        }
+        return SolveResult(
+            ok = true,
+            steps = steps,
+            answer = "$n! = $res",
+            check = if (n > 0) "Cek rekursif: $n × ($n - 1)! = $n × ${factorialBig(n - 1)} = $res." else "0! didefinisikan sama dengan 1."
+        )
+    }
+
     companion object {
         const val MODE_DASAR = "Peluang P(A) = n(A)/n(S)"
+        const val MODE_KOMBINASI = "Kombinasi C(n, r)"
+        const val MODE_PERMUTASI = "Permutasi P(n, r)"
+        const val MODE_FAKTORIAL = "Faktorial n!"
         const val MODE_DADU_1 = "1 Dadu"
         const val MODE_DADU_2 = "2 Dadu"
         const val MODE_KOIN = "Koin (1-3)"

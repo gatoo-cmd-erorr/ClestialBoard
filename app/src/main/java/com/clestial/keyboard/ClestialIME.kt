@@ -109,6 +109,7 @@ class ClestialIME : InputMethodService(), ClestialKeyboardView.Listener {
             view.closeResize()
             view.closeTranslate()
             view.closeCalc()
+            view.closeMath()
             view.closeJava()
             view.closeAi()
         }

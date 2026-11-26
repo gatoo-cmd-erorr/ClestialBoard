@@ -286,6 +286,21 @@ class MathModulesTest {
         val fh = m.solve(mapOf("mode" to ProbabilityModule.MODE_FH, "a" to "1/6", "b" to "120"))
         assertTrue(fh.ok)
         assertTrue(fh.answer.contains("20"))
+
+        val comb = m.solve(mapOf("mode" to ProbabilityModule.MODE_KOMBINASI, "a" to "10", "b" to "3"))
+        assertTrue(comb.ok)
+        assertEquals("C(10, 3) = 120", comb.answer)
+
+        val perm = m.solve(mapOf("mode" to ProbabilityModule.MODE_PERMUTASI, "a" to "5", "b" to "3"))
+        assertTrue(perm.ok)
+        assertEquals("P(5, 3) = 60", perm.answer)
+
+        val fact = m.solve(mapOf("mode" to ProbabilityModule.MODE_FAKTORIAL, "a" to "6"))
+        assertTrue(fact.ok)
+        assertEquals("6! = 720", fact.answer)
+
+        val badComb = m.solve(mapOf("mode" to ProbabilityModule.MODE_KOMBINASI, "a" to "3", "b" to "5"))
+        assertFalse(badComb.ok)
     }
 
     // ---- 10. Persamaan Garis Lurus & Fungsi Linear ----

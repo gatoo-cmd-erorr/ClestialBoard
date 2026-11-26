@@ -96,5 +96,33 @@ class JavaneseAndCalcTest {
         val divZero = ScientificCalculator.evaluate("5÷0")
         assertFalse(divZero.ok)
         assertTrue(divZero.error.contains("nol", ignoreCase = true))
+
+        // Kombinasi, Permutasi & Faktorial
+        val fact5 = ScientificCalculator.evaluate("5!")
+        assertTrue(fact5.ok)
+        assertEquals("120", fact5.insertable)
+
+        val combInfix = ScientificCalculator.evaluate("5C2")
+        assertTrue(combInfix.ok)
+        assertEquals("10", combInfix.insertable)
+
+        val combFn = ScientificCalculator.evaluate("C(6, 2)")
+        assertTrue(combFn.ok)
+        assertEquals("15", combFn.insertable)
+
+        val permInfix = ScientificCalculator.evaluate("5P2")
+        assertTrue(permInfix.ok)
+        assertEquals("20", permInfix.insertable)
+
+        val permFn = ScientificCalculator.evaluate("nPr(6, 2)")
+        assertTrue(permFn.ok)
+        assertEquals("30", permFn.insertable)
+
+        val combined = ScientificCalculator.evaluate("5C2 + 3!")
+        assertTrue(combined.ok)
+        assertEquals("16", combined.insertable)
+
+        val badComb = ScientificCalculator.evaluate("3C5")
+        assertFalse(badComb.ok)
     }
 }

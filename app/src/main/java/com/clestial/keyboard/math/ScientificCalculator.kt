@@ -17,7 +17,8 @@ import kotlin.math.tan
 /**
  * Mesin evaluasi ekspresi untuk kalkulator umum & ilmiah di keyboard:
  * mendukung +, -, ×, ÷, %, (), pangkat (^, ², ³), akar kuadrat (√), akar pangkat tiga (∛),
- * akar pangkat n (n√x), kebalikan (1/x), π, sin, cos, tan, log, ln.
+ * akar pangkat n (n√x), kebalikan (1/x), faktorial (n!), kombinasi (nCr / C(n,r)),
+ * permutasi (nPr / P(n,r)), π, sin, cos, tan, log, ln.
  *
  * Operasi rasional dasar menjaga pecahan eksak lewat [ExactFraction] bila memungkinkan,
  * dan fungsi transendental menggunakan presisi tinggi dengan pembersihan derau angka.
@@ -134,17 +135,34 @@ object ScientificCalculator {
         }
 
         private fun parseMulDiv(): Double {
-            var x = parsePower()
+            var x = parseCombPerm()
             while (pos < s.length) {
                 when (s[pos]) {
-                    '*' -> { pos++; x *= parsePower() }
+                    '*' -> { pos++; x *= parseCombPerm() }
                     '/' -> {
                         pos++
-                        val d = parsePower()
+                        val d = parseCombPerm()
                         if (d == 0.0) throw IllegalArgumentException("Pembagian dengan nol")
                         x /= d
                     }
                     else -> return x
+                }
+            }
+            return x
+        }
+
+        private fun parseCombPerm(): Double {
+            var x = parsePower()
+            while (pos < s.length) {
+                val ch = s[pos]
+                if (ch == 'C' || ch == 'P') {
+                    pos++
+                    val r = parsePower()
+                    val nInt = toNonNegInt(x, "n")
+                    val rInt = toNonNegInt(r, "r")
+                    x = if (ch == 'C') combBig(nInt, rInt).toDouble() else permBig(nInt, rInt).toDouble()
+                } else {
+                    break
                 }
             }
             return x
@@ -194,6 +212,11 @@ object ScientificCalculator {
                     '%' -> { pos++; x /= 100.0 }
                     '²' -> { pos++; x *= x }
                     '³' -> { pos++; x = x * x * x }
+                    '!' -> {
+                        pos++
+                        val nInt = toNonNegInt(x, "n")
+                        x = factorialBig(nInt).toDouble()
+                    }
                     else -> break
                 }
             }
@@ -240,6 +263,29 @@ object ScientificCalculator {
                 val start = pos
                 while (pos < s.length && s[pos].isLetter()) pos++
                 val name = s.substring(start, pos).lowercase()
+                if (name in setOf("c", "ncr", "kombinasi", "p", "npr", "permutasi")) {
+                    if (pos >= s.length || s[pos] != '(') {
+                        throw IllegalArgumentException("Gunakan format $name(n, r) atau nCr / nPr")
+                    }
+                    pos++ // '('
+                    val nVal = parseAddSub()
+                    if (pos >= s.length || s[pos] != ';') {
+                        throw IllegalArgumentException("Pisahkan n dan r dengan koma, misal C(5, 2)")
+                    }
+                    pos++ // ';'
+                    val rVal = parseAddSub()
+                    if (pos >= s.length || s[pos] != ')') {
+                        throw IllegalArgumentException("Kurung tutup ')' kurang")
+                    }
+                    pos++ // ')'
+                    val nInt = toNonNegInt(nVal, "n")
+                    val rInt = toNonNegInt(rVal, "r")
+                    return if (name in setOf("c", "ncr", "kombinasi")) {
+                        combBig(nInt, rInt).toDouble()
+                    } else {
+                        permBig(nInt, rInt).toDouble()
+                    }
+                }
                 val arg = if (pos < s.length && s[pos] == '(') {
                     pos++
                     val v = parseAddSub()
@@ -252,6 +298,40 @@ object ScientificCalculator {
                 return applyFunc(name, arg)
             }
             throw IllegalArgumentException("Simbol tidak valid '$ch'")
+        }
+
+        private fun toNonNegInt(v: Double, label: String): Int {
+            if (v.isNaN() || v.isInfinite() || v < 0.0 || abs(v - v.toLong().toDouble()) > 1e-9) {
+                throw IllegalArgumentException("Nilai $label harus bilangan bulat ≥ 0")
+            }
+            if (v > 170.0) throw IllegalArgumentException("Nilai $label maksimal 170")
+            return v.toLong().toInt()
+        }
+
+        private fun factorialBig(n: Int): BigInteger {
+            var res = BigInteger.ONE
+            for (i in 2..n) res = res.multiply(BigInteger.valueOf(i.toLong()))
+            return res
+        }
+
+        private fun combBig(n: Int, r: Int): BigInteger {
+            if (r > n) throw IllegalArgumentException("Untuk kombinasi C(n, r), nilai r ($r) tidak boleh > n ($n)")
+            val k = minOf(r, n - r)
+            var res = BigInteger.ONE
+            for (i in 1..k) {
+                res = res.multiply(BigInteger.valueOf((n - k + i).toLong()))
+                    .divide(BigInteger.valueOf(i.toLong()))
+            }
+            return res
+        }
+
+        private fun permBig(n: Int, r: Int): BigInteger {
+            if (r > n) throw IllegalArgumentException("Untuk permutasi P(n, r), nilai r ($r) tidak boleh > n ($n)")
+            var res = BigInteger.ONE
+            for (i in 0 until r) {
+                res = res.multiply(BigInteger.valueOf((n - i).toLong()))
+            }
+            return res
         }
 
         private fun applyFunc(name: String, arg: Double): Double {
@@ -282,20 +362,74 @@ object ScientificCalculator {
         }
 
         private fun normalize(raw: String): String {
-            val base = raw.replace(" ", "")
+            var base = raw.replace(" ", "")
                 .replace('×', '*')
                 .replace('÷', '/')
                 .replace(':', '/')
                 .replace('−', '-')
-                .replace(',', '.')
+                .replace("nCr", "C", ignoreCase = true)
+                .replace("nPr", "P", ignoreCase = true)
+
+            // Bedakan koma pemisah argumen pada C(n,r) / P(n,r) / kombinasi(n,r) / permutasi(n,r)
+            // dengan koma desimal (misal 2,5 -> 2.5).
+            val argCommaConverted = StringBuilder(base.length)
+            var i = 0
+            while (i < base.length) {
+                val restLower = base.substring(i).lowercase()
+                val fnMatch = listOf("kombinasi(", "permutasi(", "ncr(", "npr(", "c(", "p(")
+                    .firstOrNull { restLower.startsWith(it) && (i == 0 || !base[i - 1].isLetter()) }
+                if (fnMatch != null) {
+                    val fnName = base.substring(i, i + fnMatch.length)
+                    argCommaConverted.append(fnName)
+                    i += fnMatch.length
+                    var depth = 1
+                    while (i < base.length && depth > 0) {
+                        val c = base[i]
+                        when {
+                            c == '(' -> { depth++; argCommaConverted.append(c) }
+                            c == ')' -> { depth--; argCommaConverted.append(c) }
+                            c == ',' && depth == 1 -> argCommaConverted.append(';')
+                            c == ',' -> argCommaConverted.append('.')
+                            else -> argCommaConverted.append(c)
+                        }
+                        i++
+                    }
+                } else {
+                    val c = base[i]
+                    argCommaConverted.append(if (c == ',') '.' else c)
+                    i++
+                }
+            }
+            base = argCommaConverted.toString()
+
+            // Ubah huruf c/p di antara angka atau kurung (misal 5c2 / (3+2)c2) jadi huruf besar C / P
+            val infixNormalized = StringBuilder(base.length)
+            for (idx in base.indices) {
+                val c = base[idx]
+                val prev = if (idx > 0) base[idx - 1] else '\u0000'
+                val next = if (idx + 1 < base.length) base[idx + 1] else '\u0000'
+                val isInfixCP = (c == 'c' || c == 'p' || c == 'C' || c == 'P') &&
+                    (prev.isDigit() || prev == ')' || prev == '!') &&
+                    (next.isDigit() || next == '(')
+                if (isInfixCP) {
+                    infixNormalized.append(c.uppercaseChar())
+                } else {
+                    infixNormalized.append(c)
+                }
+            }
+            base = infixNormalized.toString()
+
             // Sisipkan perkalian implisit sederhana: 2π -> 2*π, 2( -> 2*(, )( -> )*(, 2sin -> 2*sin
             val sb = StringBuilder()
-            for (i in base.indices) {
-                val c = base[i]
-                if (i > 0) {
-                    val prev = base[i - 1]
-                    val prevEndsVal = prev.isDigit() || prev == ')' || prev == 'π' || prev == '%' || prev == '²' || prev == '³'
-                    val currStartsGroup = c == '(' || c == 'π' || c == '∛' || (c.isLetter() && !prev.isLetter())
+            for (idx in base.indices) {
+                val c = base[idx]
+                if (idx > 0) {
+                    val prev = base[idx - 1]
+                    val prevEndsVal = prev.isDigit() || prev == ')' || prev == 'π' || prev == '%' || prev == '²' || prev == '³' || prev == '!'
+                    val isInfixCombPerm = (c == 'C' || c == 'P') &&
+                        (idx + 1 < base.length && (base[idx + 1] != '(' || !hasTopLevelArgSep(base, idx + 1)))
+                    val currStartsGroup = !isInfixCombPerm &&
+                        (c == '(' || c == 'π' || c == '∛' || (c.isLetter() && !prev.isLetter()))
                     if (prevEndsVal && currStartsGroup) {
                         sb.append('*')
                     }
@@ -303,6 +437,22 @@ object ScientificCalculator {
                 sb.append(c)
             }
             return sb.toString()
+        }
+
+        private fun hasTopLevelArgSep(str: String, openParenIdx: Int): Boolean {
+            if (openParenIdx >= str.length || str[openParenIdx] != '(') return false
+            var depth = 0
+            for (j in openParenIdx until str.length) {
+                when (str[j]) {
+                    '(' -> depth++
+                    ')' -> {
+                        depth--
+                        if (depth == 0) return false
+                    }
+                    ';' -> if (depth == 1) return true
+                }
+            }
+            return false
         }
     }
 

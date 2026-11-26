@@ -131,6 +131,13 @@ object FormulaCards {
             title = "Peluang, Komplemen & Frekuensi Harapan",
             formula = "P(A) = n(A) / n(S)   |   P(A') = 1 - P(A)\nFrekuensi harapan: Fh = P(A) × N",
             notes = "Nilai peluang selalu 0 ≤ P(A) ≤ 1."
+        ),
+        FormulaCard(
+            id = "peluang_kombinasi",
+            moduleId = "peluang",
+            title = "Kombinasi C(n, r) & Permutasi P(n, r)",
+            formula = "C(n, r) = n! / (r! × (n - r)!)   [urutan bebas]\nP(n, r) = n! / (n - r)!         [urutan penting]",
+            notes = "Gunakan Kombinasi saat memilih kelompok tanpa urutan; gunakan Permutasi saat urutan/jabatan diperhatikan."
         )
     )
 

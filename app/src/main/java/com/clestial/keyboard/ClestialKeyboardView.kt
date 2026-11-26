@@ -1356,7 +1356,7 @@ class ClestialKeyboardView(context: Context) : View(context) {
     private fun emojiTabCount(): Int = EmojiData.categories.size + 1
 
     private fun panelGeo(): PanelGeo {
-        if (clipOpen || editOpen || calcOpen) {
+        if (clipOpen || editOpen || calcOpen || mathOpen) {
             // Panel Tools: bilah atas (kembali, nama, aksi), tanpa baris ABC, spasi, dan hapus di bawah.
             val tabsTop = dp(4f)
             val tabsBottom = tabsTop + rowHeight * 0.8f
@@ -3725,16 +3725,16 @@ class ClestialKeyboardView(context: Context) : View(context) {
 
     private fun mathModuleShortName(mod: MathModule): String = when (mod.id) {
         "spldv" -> "1. SPLDV"
-        "power_root" -> "2. Pangkat"
-        "quadratic_eq" -> "3. Kuadrat"
-        "quadratic_func" -> "4. F.Kuadrat"
-        "geom_trans" -> "5. Transformasi"
-        "congruence_sim" -> "6. Kesebangunan"
-        "curved_solid" -> "7. BRSL"
-        "statistics" -> "8. Statistika"
-        "probability" -> "9. Peluang"
-        "linear_line" -> "10. Garis"
-        "plsv" -> "11. PLSV"
+        "pangkat_akar" -> "2. Pangkat"
+        "persamaan_kuadrat" -> "3. Kuadrat"
+        "fungsi_kuadrat" -> "4. F.Kuadrat"
+        "garis_linear" -> "5. Garis"
+        "plsv_ptlsv" -> "6. PLSV"
+        "transformasi" -> "7. Transformasi"
+        "kesebangunan" -> "8. Kesebangunan"
+        "bangun_ruang" -> "9. BRSL"
+        "statistika" -> "10. Statistika"
+        "peluang" -> "11. Peluang & C/P"
         else -> mod.name
     }
 
@@ -3794,6 +3794,7 @@ class ClestialKeyboardView(context: Context) : View(context) {
                 CalcKey("y", "y", 0),
                 CalcKey("(", "(", 1),
                 CalcKey(")", ")", 1),
+                CalcKey(";", ";", 1),
                 CalcKey("AC", "AC", 1)
             ),
             listOf(
@@ -3801,21 +3802,24 @@ class ClestialKeyboardView(context: Context) : View(context) {
                 CalcKey("<", "<", 1),
                 CalcKey(">", ">", 1),
                 CalcKey("^", "^", 1),
+                CalcKey(":", ":", 1),
                 CalcKey("⌫", "DEL", 1)
             ),
             listOf(
                 CalcKey("≤", "<=", 1),
                 CalcKey("≥", ">=", 1),
                 CalcKey("f(x)", "f(", 1),
+                CalcKey("π", "π", 1),
                 CalcKey("-", "-", 1),
                 CalcKey("TAB", "TAB", 1)
             ),
             listOf(
-                CalcKey("123", "MODE", 1, 1.1f),
-                CalcKey(" ", " ", 0, 1.2f),
+                CalcKey("123", "MODE", 1, 1.0f),
+                CalcKey(" ", " ", 0, 1.1f),
                 CalcKey(",", ",", 0, 0.8f),
+                CalcKey("/", "/", 1, 0.8f),
                 CalcKey("+", "+", 1, 0.8f),
-                CalcKey("HITUNG", "SOLVE", 2, 1.4f)
+                CalcKey("HITUNG", "SOLVE", 2, 1.5f)
             )
         )
     }
@@ -4380,6 +4384,7 @@ class ClestialKeyboardView(context: Context) : View(context) {
         if (calcOpen) return
         closeResize()
         closeTranslate()
+        closeMath()
         closeJava()
         closeAi()
         closeClipboard()
@@ -4459,11 +4464,11 @@ class ClestialKeyboardView(context: Context) : View(context) {
                 CalcKey("ln", "ln(", 1)
             ),
             listOf(
+                CalcKey("nCr", "C", 1),
+                CalcKey("nPr", "P", 1),
+                CalcKey("n!", "!", 1),
                 CalcKey("x³", "³", 1),
                 CalcKey("1/x", "1/(", 1),
-                CalcKey("abs", "abs(", 1),
-                CalcKey("(", "(", 1),
-                CalcKey(")", ")", 1),
                 CalcKey("AC", "AC", 1)
             ),
             listOf(
@@ -4480,7 +4485,7 @@ class ClestialKeyboardView(context: Context) : View(context) {
                 CalcKey("6", "6", 0),
                 CalcKey("-", "-", 1),
                 CalcKey("+", "+", 1),
-                CalcKey("π", "π", 1)
+                CalcKey("abs", "abs(", 1)
             ),
             listOf(
                 CalcKey("1", "1", 0),
