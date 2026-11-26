@@ -1,6 +1,8 @@
 package com.clestial.keyboard.floating
 
 import android.app.Activity
+import android.content.ClipData
+import android.content.ClipboardManager
 import android.content.Context
 import android.content.Intent
 import android.graphics.Bitmap
@@ -14,6 +16,9 @@ import android.os.Bundle
 import android.os.Handler
 import android.os.Looper
 import android.widget.Toast
+import com.clestial.keyboard.Prefs
+import com.clestial.keyboard.autoanswer.AbcdSolver
+import com.clestial.keyboard.autoanswer.AutoAnswerAccessibilityService
 import com.google.mlkit.vision.common.InputImage
 import com.google.mlkit.vision.text.TextRecognition
 import com.google.mlkit.vision.text.latin.TextRecognizerOptions
@@ -140,15 +145,49 @@ class ScreenCaptureActivity : Activity() {
         val inputImage = InputImage.fromBitmap(bitmap, 0)
         recognizer.process(inputImage)
             .addOnSuccessListener { visionText ->
-                val text = visionText.text.trim().replace("\n", " ")
-                if (text.isNotEmpty()) {
-                    Toast.makeText(applicationContext, "Soal terbaca: $text", Toast.LENGTH_SHORT).show()
-                    FloatingMenuManager.searchGoogle(applicationContext, text)
+                val rawText = visionText.text.trim()
+                val prefs = Prefs(applicationContext)
+                val abcdQ = if (prefs.autoAnswerEnabled) AbcdSolver.parseFromText(rawText) else null
+
+                if (abcdQ != null) {
+                    Toast.makeText(applicationContext, "🎯 Soal ABCD terdeteksi! Memecahkan jawaban...", Toast.LENGTH_SHORT).show()
+                    AbcdSolver.solve(abcdQ, prefs) { solution ->
+                        val cm = getSystemService(Context.CLIPBOARD_SERVICE) as ClipboardManager
+                        val summary = if (solution.ok) {
+                            "🎯 Kunci: [${solution.selectedOption}] ${solution.optionText}\n" +
+                            "Sumber: ${solution.source}\n" +
+                            "Penjelasan: ${solution.explanation}"
+                        } else {
+                            "Error: ${solution.error ?: "Gagal memproses soal."}"
+                        }
+
+                        cm.setPrimaryClip(ClipData.newPlainText("Kunci Jawaban", summary))
+
+                        val service = AutoAnswerAccessibilityService.instance
+                        if (solution.ok && service != null && prefs.autoAnswerMode == Prefs.MODE_AUTO_CLICK) {
+                            service.triggerAutoAnswer { _, _ -> }
+                        }
+
+                        Toast.makeText(
+                            applicationContext,
+                            if (solution.ok) "🎯 Kunci: [${solution.selectedOption}] ${solution.optionText}" else "Gagal memecahkan soal ABCD",
+                            Toast.LENGTH_LONG
+                        ).show()
+
+                        FloatingMenuManager.showAutoAnswer(applicationContext, summary)
+                        finish()
+                    }
                 } else {
-                    Toast.makeText(applicationContext, "Tidak ada teks/soal terbaca di dalam kotak", Toast.LENGTH_SHORT).show()
-                    FloatingMenuManager.searchGoogle(applicationContext, "")
+                    val text = rawText.replace("\n", " ")
+                    if (text.isNotEmpty()) {
+                        Toast.makeText(applicationContext, "Soal terbaca: $text", Toast.LENGTH_SHORT).show()
+                        FloatingMenuManager.searchGoogle(applicationContext, text)
+                    } else {
+                        Toast.makeText(applicationContext, "Tidak ada teks/soal terbaca di dalam kotak", Toast.LENGTH_SHORT).show()
+                        FloatingMenuManager.searchGoogle(applicationContext, "")
+                    }
+                    finish()
                 }
-                finish()
             }
             .addOnFailureListener { e ->
                 Toast.makeText(applicationContext, "OCR Gagal: ${e.message}", Toast.LENGTH_SHORT).show()

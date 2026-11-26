@@ -275,4 +275,7 @@
 
     <string name="soon_title">Segera hadir</string>
     <string name="soon_desc">Suggestion strip, prediksi kata, autocorrect, saran emoji, riwayat clipboard, dan swipe typing menyusul di tahap berikutnya.</string>
+
+    <string name="accessibility_service_label">Clestial Auto Jawab ABCD</string>
+    <string name="accessibility_service_desc">Layanan bantuan interaktif untuk mengenali soal pilihan ganda dan mengklik opsi jawaban otomatis secara cerdas pada aplikasi ujian/kuis mahasiswa.</string>
 </resources>

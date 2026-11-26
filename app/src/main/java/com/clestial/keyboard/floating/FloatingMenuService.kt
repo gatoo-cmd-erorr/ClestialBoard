@@ -32,8 +32,14 @@ import android.widget.ImageView
 import android.widget.LinearLayout
 import android.widget.TextView
 import android.widget.Toast
+import android.provider.Settings
+import androidx.appcompat.widget.SwitchCompat
 import com.clestial.keyboard.Prefs
 import com.clestial.keyboard.R
+import com.clestial.keyboard.autoanswer.AbcdSolutionResult
+import com.clestial.keyboard.autoanswer.AbcdSolver
+import com.clestial.keyboard.autoanswer.AutoAnswerAccessibilityService
+import com.clestial.keyboard.quiz.QuizPracticeActivity
 import com.clestial.keyboard.math.AiRouterClient
 import com.clestial.keyboard.math.FieldType
 import com.clestial.keyboard.math.MathModule
@@ -118,6 +124,15 @@ class FloatingMenuService : Service() {
                 hideDock()
                 hideSelectionBox()
                 showPopup(tabIndex = 1, initialQuery = query)
+            }
+            FloatingMenuManager.ACTION_SHOW_AUTO_ANSWER -> {
+                val solText = intent.getStringExtra(FloatingMenuManager.EXTRA_SOLUTION)
+                hideDock()
+                hideSelectionBox()
+                showPopup(tabIndex = 3)
+                if (!solText.isNullOrEmpty()) {
+                    popupView?.findViewById<TextView>(R.id.tvAutoAnswerStatus)?.text = solText
+                }
             }
             else -> {
                 if (!isPopupShowing && !isDockShowing && !isBoxShowing) {
@@ -297,7 +312,26 @@ class FloatingMenuService : Service() {
             showPopup(2)
         }
 
-        // 5. ✕ Tutup Dock (Kembali ke mode tersamar)
+        // 5. 🎯 Auto Jawab Soal ABCD
+        dockRoot.findViewById<View>(R.id.btnDockAutoAnswer).setOnClickListener {
+            hideDock()
+            val service = AutoAnswerAccessibilityService.instance
+            if (service != null && prefs.autoAnswerMode == Prefs.MODE_AUTO_CLICK) {
+                Toast.makeText(this, "⚡ Memindai & menjawab otomatis...", Toast.LENGTH_SHORT).show()
+                service.triggerAutoAnswer { success, msg ->
+                    // Jawaban dieksekusi oleh service
+                }
+            } else {
+                showPopup(3)
+            }
+        }
+        dockRoot.findViewById<View>(R.id.btnDockAutoAnswer).setOnLongClickListener {
+            hideDock()
+            showPopup(3)
+            true
+        }
+
+        // 6. ✕ Tutup Dock (Kembali ke mode tersamar)
         dockRoot.findViewById<View>(R.id.btnDockHide).setOnClickListener {
             hideDock()
             showBubble()
@@ -570,23 +604,28 @@ class FloatingMenuService : Service() {
         val tabAi = popup.findViewById<TextView>(R.id.tabAi)
         val tabGoogle = popup.findViewById<TextView>(R.id.tabGoogle)
         val tabMath = popup.findViewById<TextView>(R.id.tabMath)
+        val tabAutoAnswer = popup.findViewById<TextView>(R.id.tabAutoAnswer)
         val panelAi = popup.findViewById<View>(R.id.panelAi)
         val panelGoogle = popup.findViewById<View>(R.id.panelGoogle)
         val panelMath = popup.findViewById<View>(R.id.panelMath)
+        val panelAutoAnswer = popup.findViewById<View>(R.id.panelAutoAnswer)
 
         fun selectTab(idx: Int) {
             tabAi.isSelected = (idx == 0)
             tabGoogle.isSelected = (idx == 1)
             tabMath.isSelected = (idx == 2)
+            tabAutoAnswer.isSelected = (idx == 3)
             panelAi.visibility = if (idx == 0) View.VISIBLE else View.GONE
             panelGoogle.visibility = if (idx == 1) View.VISIBLE else View.GONE
             panelMath.visibility = if (idx == 2) View.VISIBLE else View.GONE
+            panelAutoAnswer.visibility = if (idx == 3) View.VISIBLE else View.GONE
         }
         selectTabRef = ::selectTab
 
         tabAi.setOnClickListener { selectTab(0) }
         tabGoogle.setOnClickListener { selectTab(1) }
         tabMath.setOnClickListener { selectTab(2) }
+        tabAutoAnswer.setOnClickListener { selectTab(3) }
         selectTab(0)
 
         // --- Tab 1: AI (ChatGPT)
@@ -796,6 +835,142 @@ class FloatingMenuService : Service() {
                 Toast.makeText(this, "Solusi dan langkah berhasil disalin!", Toast.LENGTH_SHORT).show()
             } else {
                 Toast.makeText(this, "Belum ada solusi untuk disalin", Toast.LENGTH_SHORT).show()
+            }
+        }
+
+        // --- Tab 4: Auto Jawab ABCD
+        val tvAccStatus = popup.findViewById<TextView>(R.id.tvAutoAnswerAccStatus)
+        val btnAccSettings = popup.findViewById<Button>(R.id.btnOpenAccSettings)
+        val switchAutoAnswer = popup.findViewById<SwitchCompat>(R.id.switchAutoAnswerEnabled)
+        val btnModeAuto = popup.findViewById<Button>(R.id.btnModeAutoClick)
+        val btnModeKey = popup.findViewById<Button>(R.id.btnModeKeyOnly)
+        val btnD0 = popup.findViewById<Button>(R.id.btnDelay0)
+        val btnD1 = popup.findViewById<Button>(R.id.btnDelay1)
+        val btnD2 = popup.findViewById<Button>(R.id.btnDelay2)
+        val btnD3 = popup.findViewById<Button>(R.id.btnDelay3)
+        val btnTriggerScreen = popup.findViewById<Button>(R.id.btnTriggerScreenAnswer)
+        val btnOpenQuiz = popup.findViewById<Button>(R.id.btnOpenQuizApp)
+        val tvAutoStatus = popup.findViewById<TextView>(R.id.tvAutoAnswerStatus)
+        val btnCopyAuto = popup.findViewById<Button>(R.id.btnCopyAutoAnswer)
+
+        fun updateAccStatus() {
+            val running = AutoAnswerAccessibilityService.isRunning
+            if (running) {
+                tvAccStatus.text = "Aksesibilitas: Aktif (Auto-Klik Siap)"
+                tvAccStatus.setTextColor(Color.parseColor("#10B981"))
+                btnAccSettings.text = "Pengaturan"
+            } else {
+                tvAccStatus.text = "Aksesibilitas: Nonaktif (Klik untuk Izin)"
+                tvAccStatus.setTextColor(Color.parseColor("#F59E0B"))
+                btnAccSettings.text = "Aktifkan Izin"
+            }
+        }
+        updateAccStatus()
+        AutoAnswerAccessibilityService.onStatusChangedListener = {
+            mainHandler.post { updateAccStatus() }
+        }
+
+        btnAccSettings.setOnClickListener {
+            val intent = Intent(Settings.ACTION_ACCESSIBILITY_SETTINGS).apply {
+                flags = Intent.FLAG_ACTIVITY_NEW_TASK
+            }
+            startActivity(intent)
+            Toast.makeText(this, "Nyalakan 'Clestial Auto Jawab ABCD' di daftar layanan", Toast.LENGTH_LONG).show()
+        }
+
+        switchAutoAnswer.isChecked = prefs.autoAnswerEnabled
+        switchAutoAnswer.setOnCheckedChangeListener { _, isChecked ->
+            prefs.autoAnswerEnabled = isChecked
+            Toast.makeText(this, if (isChecked) "Auto-Jawab ABCD Diaktifkan" else "Auto-Jawab ABCD Dinonaktifkan", Toast.LENGTH_SHORT).show()
+        }
+
+        fun updateModeUI() {
+            val isAuto = prefs.autoAnswerMode == Prefs.MODE_AUTO_CLICK
+            btnModeAuto.setBackgroundResource(if (isAuto) R.drawable.bg_pill_on else R.drawable.bg_pill)
+            btnModeAuto.setTextColor(if (isAuto) Color.WHITE else Color.parseColor("#94A3B8"))
+            btnModeKey.setBackgroundResource(if (!isAuto) R.drawable.bg_pill_on else R.drawable.bg_pill)
+            btnModeKey.setTextColor(if (!isAuto) Color.WHITE else Color.parseColor("#94A3B8"))
+        }
+        updateModeUI()
+
+        btnModeAuto.setOnClickListener {
+            prefs.autoAnswerMode = Prefs.MODE_AUTO_CLICK
+            updateModeUI()
+            Toast.makeText(this, "Mode: Auto-Klik Layar (Accessibility)", Toast.LENGTH_SHORT).show()
+        }
+        btnModeKey.setOnClickListener {
+            prefs.autoAnswerMode = Prefs.MODE_KEY_ONLY
+            updateModeUI()
+            Toast.makeText(this, "Mode: Kunci Jawaban & Salin Saja", Toast.LENGTH_SHORT).show()
+        }
+
+        fun updateDelayUI() {
+            val cur = prefs.autoAnswerDelayMs
+            btnD0.setBackgroundResource(if (cur == 0) R.drawable.bg_pill_on else R.drawable.bg_pill)
+            btnD0.setTextColor(if (cur == 0) Color.WHITE else Color.parseColor("#94A3B8"))
+            btnD1.setBackgroundResource(if (cur == 1500) R.drawable.bg_pill_on else R.drawable.bg_pill)
+            btnD1.setTextColor(if (cur == 1500) Color.WHITE else Color.parseColor("#94A3B8"))
+            btnD2.setBackgroundResource(if (cur == 2000) R.drawable.bg_pill_on else R.drawable.bg_pill)
+            btnD2.setTextColor(if (cur == 2000) Color.WHITE else Color.parseColor("#94A3B8"))
+            btnD3.setBackgroundResource(if (cur == 3000) R.drawable.bg_pill_on else R.drawable.bg_pill)
+            btnD3.setTextColor(if (cur == 3000) Color.WHITE else Color.parseColor("#94A3B8"))
+        }
+        updateDelayUI()
+
+        btnD0.setOnClickListener { prefs.autoAnswerDelayMs = 0; updateDelayUI() }
+        btnD1.setOnClickListener { prefs.autoAnswerDelayMs = 1500; updateDelayUI() }
+        btnD2.setOnClickListener { prefs.autoAnswerDelayMs = 2000; updateDelayUI() }
+        btnD3.setOnClickListener { prefs.autoAnswerDelayMs = 3000; updateDelayUI() }
+
+        var lastAnswerResultText = ""
+
+        fun displaySolution(res: AbcdSolutionResult) {
+            val text = if (res.ok) {
+                "🎯 Kunci: [${res.selectedOption}] ${res.optionText}\n" +
+                "Sumber: ${res.source}\n" +
+                "Penjelasan: ${res.explanation}"
+            } else {
+                "Error: ${res.error ?: "Gagal memproses soal."}"
+            }
+            lastAnswerResultText = text
+            tvAutoStatus.text = text
+        }
+
+        AutoAnswerAccessibilityService.onAnswerResultListener = { sol ->
+            mainHandler.post { displaySolution(sol) }
+        }
+
+        btnTriggerScreenAnswer.setOnClickListener {
+            val service = AutoAnswerAccessibilityService.instance
+            if (service != null) {
+                tvAutoStatus.text = "Sedang memindai soal di layar & menentukan jawaban..."
+                service.triggerAutoAnswer { success, msg ->
+                    mainHandler.post {
+                        if (!success && !tvAutoStatus.text.startsWith("🎯 Kunci:")) {
+                            tvAutoStatus.text = msg
+                        }
+                    }
+                }
+            } else {
+                tvAutoStatus.text = "Layanan Aksesibilitas belum aktif. Aktifkan izin untuk auto-klik langsung di layar."
+                Toast.makeText(this, "Izin Aksesibilitas belum aktif", Toast.LENGTH_SHORT).show()
+            }
+        }
+
+        btnOpenQuizApp.setOnClickListener {
+            hidePopup()
+            val intent = Intent(this, QuizPracticeActivity::class.java).apply {
+                flags = Intent.FLAG_ACTIVITY_NEW_TASK
+            }
+            startActivity(intent)
+        }
+
+        btnCopyAutoAnswer.setOnClickListener {
+            if (lastAnswerResultText.isNotEmpty()) {
+                cm.setPrimaryClip(ClipData.newPlainText("Kunci Jawaban Soal", lastAnswerResultText))
+                Toast.makeText(this, "Kunci jawaban berhasil disalin!", Toast.LENGTH_SHORT).show()
+            } else {
+                Toast.makeText(this, "Belum ada kunci jawaban untuk disalin", Toast.LENGTH_SHORT).show()
             }
         }
 

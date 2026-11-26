@@ -20,7 +20,9 @@ object FloatingMenuManager {
     const val ACTION_HIDE_BOX = "com.clestial.keyboard.floating.ACTION_HIDE_BOX"
 
     const val ACTION_SEARCH_GOOGLE = "com.clestial.keyboard.floating.ACTION_SEARCH_GOOGLE"
+    const val ACTION_SHOW_AUTO_ANSWER = "com.clestial.keyboard.floating.ACTION_SHOW_AUTO_ANSWER"
     const val EXTRA_QUERY = "extra_query"
+    const val EXTRA_SOLUTION = "extra_solution"
 
     fun canDrawOverlays(context: Context): Boolean {
         return if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.M) {
@@ -86,6 +88,17 @@ object FloatingMenuManager {
         val intent = Intent(context, FloatingMenuService::class.java).apply {
             action = ACTION_SEARCH_GOOGLE
             putExtra(EXTRA_QUERY, query)
+        }
+        context.startService(intent)
+    }
+
+    fun showAutoAnswer(context: Context, solutionText: String? = null) {
+        if (!canDrawOverlays(context)) return
+        val intent = Intent(context, FloatingMenuService::class.java).apply {
+            action = ACTION_SHOW_AUTO_ANSWER
+            if (solutionText != null) {
+                putExtra(EXTRA_SOLUTION, solutionText)
+            }
         }
         context.startService(intent)
     }

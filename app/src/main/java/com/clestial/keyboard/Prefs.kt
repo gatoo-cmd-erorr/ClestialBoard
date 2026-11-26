@@ -248,6 +248,32 @@ class Prefs(context: Context) {
         get() = readBool(KEY_FLOATING_KB_TRIGGER, true)
         set(value) = writeBool(KEY_FLOATING_KB_TRIGGER, value)
 
+    /** Fitur Auto Jawab Soal ABCD aktif. */
+    var autoAnswerEnabled: Boolean
+        get() = readBool(KEY_AUTO_ANSWER_ENABLED, true)
+        set(value) = writeBool(KEY_AUTO_ANSWER_ENABLED, value)
+
+    /** Mode Auto Jawab: [MODE_AUTO_CLICK] (klik via Accessibility) atau [MODE_KEY_ONLY] (kunci jawaban & salin saja). */
+    var autoAnswerMode: String
+        get() = readString(KEY_AUTO_ANSWER_MODE, MODE_AUTO_CLICK)
+        set(value) {
+            val safe = if (value == MODE_KEY_ONLY) MODE_KEY_ONLY else MODE_AUTO_CLICK
+            sp.edit().putString(KEY_AUTO_ANSWER_MODE, safe).apply()
+        }
+
+    /** Waktu jeda (delay) sebelum auto-klik dalam milidetik (0 s.d 5000 ms, default 1500 ms). */
+    var autoAnswerDelayMs: Int
+        get() = readInt(KEY_AUTO_ANSWER_DELAY, 1500, 0, 5000)
+        set(value) = writeInt(KEY_AUTO_ANSWER_DELAY, value, 0, 5000)
+
+    /** Engine pemecah soal ABCD: [ENGINE_AI] (AI / ChatGPT) atau [ENGINE_LOCAL] (Lokal Eksak). */
+    var autoAnswerEngine: String
+        get() = readString(KEY_AUTO_ANSWER_ENGINE, ENGINE_AI)
+        set(value) {
+            val safe = if (value == ENGINE_LOCAL) ENGINE_LOCAL else ENGINE_AI
+            sp.edit().putString(KEY_AUTO_ANSWER_ENGINE, safe).apply()
+        }
+
     /** Tombol kontrol kursor di bilah Tools (panah, pilih, salin, tempel, potong). */
     var cursorTool: Boolean
         get() = readBool(KEY_CURSOR_TOOL, true)
@@ -499,6 +525,14 @@ class Prefs(context: Context) {
         const val KEY_FLOATING_OPACITY = "floating_opacity"
         const val KEY_FLOATING_SIZE = "floating_size_dp"
         const val KEY_FLOATING_KB_TRIGGER = "floating_kb_trigger"
+        const val KEY_AUTO_ANSWER_ENABLED = "auto_answer_enabled"
+        const val KEY_AUTO_ANSWER_MODE = "auto_answer_mode"
+        const val KEY_AUTO_ANSWER_DELAY = "auto_answer_delay_ms"
+        const val KEY_AUTO_ANSWER_ENGINE = "auto_answer_engine"
+        const val MODE_AUTO_CLICK = "auto_click"
+        const val MODE_KEY_ONLY = "key_only"
+        const val ENGINE_AI = "ai"
+        const val ENGINE_LOCAL = "local"
 
         /** Semua kunci pengaturan mengetik (semua kecuali tema). */
         private val TYPING_KEYS = listOf(

@@ -75,6 +75,18 @@
             android:scaleType="fitCenter"
             android:src="@drawable/ic_kb_math" />
 
+        <!-- 5. 🎯 Auto Jawab Soal ABCD Langsung -->
+        <ImageButton
+            android:id="@+id/btnDockAutoAnswer"
+            android:layout_width="44dp"
+            android:layout_height="44dp"
+            android:layout_marginTop="4dp"
+            android:background="@android:color/transparent"
+            android:contentDescription="Auto Jawab Soal ABCD"
+            android:padding="10dp"
+            android:scaleType="fitCenter"
+            android:src="@drawable/ic_dock_auto_answer" />
+
         <!-- Pemisah tipis -->
         <View
             android:layout_width="28dp"
