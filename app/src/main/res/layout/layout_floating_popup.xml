@@ -62,7 +62,6 @@
             android:layout_weight="1"
             android:background="@drawable/bg_floating_tab"
             android:gravity="center"
-            android:selected="true"
             android:text="✨ Tanya AI"
             android:textColor="#FFFFFF"
             android:textSize="12sp"

@@ -279,6 +279,7 @@ class FloatingMenuService : Service() {
         tabAi.setOnClickListener { selectTab(0) }
         tabGoogle.setOnClickListener { selectTab(1) }
         tabMath.setOnClickListener { selectTab(2) }
+        selectTab(0)
 
         // --- Tab 1: AI (ChatGPT)
         val etAi = popup.findViewById<EditText>(R.id.etAiQuestion)
