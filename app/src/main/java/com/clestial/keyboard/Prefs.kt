@@ -230,7 +230,7 @@ class Prefs(context: Context) {
 
     /** Menu Pop-up Melayang Anti Detek aktif. */
     var floatingEnabled: Boolean
-        get() = readBool(KEY_FLOATING_ENABLED, false)
+        get() = readBool(KEY_FLOATING_ENABLED, true)
         set(value) = writeBool(KEY_FLOATING_ENABLED, value)
 
     /** Opasitas/transparansi tombol melayang (persen: 10% sangat samar s.d 100% jelas). */

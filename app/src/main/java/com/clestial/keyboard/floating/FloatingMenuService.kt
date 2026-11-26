@@ -120,7 +120,7 @@ class FloatingMenuService : Service() {
                 showPopup(tabIndex = 1, initialQuery = query)
             }
             else -> {
-                if (!isPopupShowing && !isDockShowing && !isBoxShowing && bubbleView == null) {
+                if (!isPopupShowing && !isDockShowing && !isBoxShowing) {
                     showBubble()
                 }
             }

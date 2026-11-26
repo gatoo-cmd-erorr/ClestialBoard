@@ -14,3 +14,4 @@ captures/
 .env.*
 node_modules/
 *.log
+monitor_build.py

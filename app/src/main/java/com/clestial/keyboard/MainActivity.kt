@@ -282,12 +282,15 @@ class MainActivity : AppCompatActivity() {
         val canDraw = FloatingMenuManager.canDrawOverlays(this)
         val active = canDraw && prefs.floatingEnabled
         switchFloating.isChecked = active
+        if (active) {
+            FloatingMenuManager.start(this)
+        }
         val tvStatus = findViewById<TextView>(R.id.tvFloatingCardStatus) ?: return
         if (!canDraw) {
             tvStatus.text = "Izin 'Tampilkan di atas aplikasi lain' belum diberikan. Ketuk untuk memberi izin."
             tvStatus.setTextColor(0xFFF59E0B.toInt())
         } else if (active) {
-            tvStatus.text = "Aktif (Gelembung tersamar siap di layar). Ketuk 2x gelembung untuk buka menu."
+            tvStatus.text = "Aktif (Gelembung tersamar siap di layar). Ketuk untuk buka menu."
             tvStatus.setTextColor(0xFF10B981.toInt())
         } else {
             tvStatus.text = getString(R.string.floating_card_desc)
