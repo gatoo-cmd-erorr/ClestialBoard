@@ -278,4 +278,6 @@
 
     <string name="accessibility_service_label">Clestial Auto Jawab ABCD</string>
     <string name="accessibility_service_desc">Layanan bantuan interaktif untuk mengenali soal pilihan ganda dan mengklik opsi jawaban otomatis secara cerdas pada aplikasi ujian/kuis mahasiswa.</string>
+    <string name="overlay_accessibility_label">Clestial Floating Overlay</string>
+    <string name="overlay_accessibility_desc">Menampilkan navigasi tombol melayang tersamar dan asisten cepat di atas semua aplikasi menggunakan TYPE_ACCESSIBILITY_OVERLAY.</string>
 </resources>

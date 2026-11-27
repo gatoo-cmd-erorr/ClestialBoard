@@ -26,6 +26,7 @@ object FloatingMenuManager {
     const val EXTRA_SOLUTION = "extra_solution"
 
     fun canDrawOverlays(context: Context): Boolean {
+        if (OverlayAccessibilityService.isRunning) return true
         return if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.M) {
             Settings.canDrawOverlays(context)
         } else {
@@ -49,6 +50,12 @@ object FloatingMenuManager {
         if (!canDrawOverlays(context)) return
         val prefs = Prefs(context)
         prefs.floatingEnabled = true
+        val accessibilityService = OverlayAccessibilityService.instance
+        if (accessibilityService != null) {
+            accessibilityService.showFloatingBubble()
+            context.stopService(Intent(context, FloatingMenuService::class.java))
+            return
+        }
         val intent = Intent(context, FloatingMenuService::class.java)
         context.startService(intent)
     }
@@ -56,68 +63,59 @@ object FloatingMenuManager {
     fun stop(context: Context) {
         val prefs = Prefs(context)
         prefs.floatingEnabled = false
+        OverlayAccessibilityService.instance?.hideFloatingOverlay()
         val intent = Intent(context, FloatingMenuService::class.java)
         context.stopService(intent)
     }
 
     fun show(context: Context) {
-        if (!canDrawOverlays(context)) return
-        val intent = Intent(context, FloatingMenuService::class.java).apply {
-            action = ACTION_SHOW_MENU
-        }
-        context.startService(intent)
+        dispatchAction(context, ACTION_SHOW_MENU)
     }
 
     fun showDock(context: Context) {
-        if (!canDrawOverlays(context)) return
-        val intent = Intent(context, FloatingMenuService::class.java).apply {
-            action = ACTION_SHOW_DOCK
-        }
-        context.startService(intent)
+        dispatchAction(context, ACTION_SHOW_DOCK)
     }
 
     fun showSelectionBox(context: Context) {
-        if (!canDrawOverlays(context)) return
-        val intent = Intent(context, FloatingMenuService::class.java).apply {
-            action = ACTION_SHOW_BOX
-        }
-        context.startService(intent)
+        dispatchAction(context, ACTION_SHOW_BOX)
     }
 
     fun searchGoogle(context: Context, query: String) {
-        if (!canDrawOverlays(context)) return
-        val intent = Intent(context, FloatingMenuService::class.java).apply {
-            action = ACTION_SEARCH_GOOGLE
-            putExtra(EXTRA_QUERY, query)
-        }
-        context.startService(intent)
+        dispatchAction(context, ACTION_SEARCH_GOOGLE, query = query)
     }
 
     fun showAutoAnswer(context: Context, solutionText: String? = null) {
-        if (!canDrawOverlays(context)) return
-        val intent = Intent(context, FloatingMenuService::class.java).apply {
-            action = ACTION_SHOW_AUTO_ANSWER
-            if (solutionText != null) {
-                putExtra(EXTRA_SOLUTION, solutionText)
-            }
-        }
-        context.startService(intent)
+        dispatchAction(context, ACTION_SHOW_AUTO_ANSWER, solution = solutionText)
     }
 
     fun showAiResult(context: Context, questionText: String, answerText: String) {
-        if (!canDrawOverlays(context)) return
-        val intent = Intent(context, FloatingMenuService::class.java).apply {
-            action = ACTION_SHOW_AI_RESULT
-            putExtra(EXTRA_QUERY, questionText)
-            putExtra(EXTRA_SOLUTION, answerText)
-        }
-        context.startService(intent)
+        dispatchAction(context, ACTION_SHOW_AI_RESULT, query = questionText, solution = answerText)
     }
 
     fun toggle(context: Context) {
+        dispatchAction(context, ACTION_TOGGLE_MENU)
+    }
+
+    private fun dispatchAction(
+        context: Context,
+        action: String,
+        query: String? = null,
+        solution: String? = null
+    ) {
         if (!canDrawOverlays(context)) return
+        val accessibilityService = OverlayAccessibilityService.instance
+        if (accessibilityService != null) {
+            accessibilityService.dispatchAction(action, query, solution)
+            return
+        }
         val intent = Intent(context, FloatingMenuService::class.java).apply {
-            action = ACTION_TOGGLE_MENU
+            this.action = action
+            if (query != null) {
+                putExtra(EXTRA_QUERY, query)
+            }
+            if (solution != null) {
+                putExtra(EXTRA_SOLUTION, solution)
+            }
         }
         context.startService(intent)
     }
