@@ -1,5 +1,6 @@
 <?xml version="1.0" encoding="utf-8"?>
 <LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
+    xmlns:app="http://schemas.android.com/apk/res-auto"
     android:id="@+id/floatingRoot"
     android:layout_width="match_parent"
     android:layout_height="wrap_content"
@@ -41,9 +42,9 @@
             android:layout_width="32dp"
             android:layout_height="32dp"
             android:layout_marginStart="8dp"
-            android:background="?android:attr/selectableItemBackgroundBorderless"
+            android:background="@drawable/bg_floating_pill"
             android:contentDescription="Tutup"
-            android:padding="6dp"
+            android:padding="7dp"
             android:scaleType="fitCenter"
             android:src="@drawable/ic_kb_close" />
     </LinearLayout>
@@ -143,38 +144,47 @@
                 android:layout_marginTop="6dp"
                 android:orientation="horizontal">
 
-                <Button
+                <androidx.appcompat.widget.AppCompatButton
                     android:id="@+id/btnAiPaste"
-                    style="?android:attr/borderlessButtonStyle"
                     android:layout_width="wrap_content"
                     android:layout_height="match_parent"
                     android:background="@drawable/bg_floating_pill"
+                    android:minHeight="0dp"
+                    android:minWidth="0dp"
                     android:paddingHorizontal="10dp"
+                    android:stateListAnimator="@null"
                     android:text="📋 Tempel"
+                    android:textAllCaps="false"
                     android:textColor="#E2E8F0"
                     android:textSize="11sp" />
 
-                <Button
+                <androidx.appcompat.widget.AppCompatButton
                     android:id="@+id/btnAiClear"
-                    style="?android:attr/borderlessButtonStyle"
                     android:layout_width="wrap_content"
                     android:layout_height="match_parent"
                     android:layout_marginStart="6dp"
                     android:background="@drawable/bg_floating_pill"
+                    android:minHeight="0dp"
+                    android:minWidth="0dp"
                     android:paddingHorizontal="10dp"
+                    android:stateListAnimator="@null"
                     android:text="Hapus"
+                    android:textAllCaps="false"
                     android:textColor="#94A3B8"
                     android:textSize="11sp" />
 
-                <Button
+                <androidx.appcompat.widget.AppCompatButton
                     android:id="@+id/btnAiKeyToggle"
-                    style="?android:attr/borderlessButtonStyle"
                     android:layout_width="wrap_content"
                     android:layout_height="match_parent"
                     android:layout_marginStart="6dp"
                     android:background="@drawable/bg_floating_pill"
+                    android:minHeight="0dp"
+                    android:minWidth="0dp"
                     android:paddingHorizontal="10dp"
+                    android:stateListAnimator="@null"
                     android:text="🔑 Key"
+                    android:textAllCaps="false"
                     android:textColor="#38BDF8"
                     android:textSize="11sp" />
 
@@ -183,13 +193,17 @@
                     android:layout_height="1dp"
                     android:layout_weight="1" />
 
-                <Button
+                <androidx.appcompat.widget.AppCompatButton
                     android:id="@+id/btnAiSubmit"
                     android:layout_width="wrap_content"
                     android:layout_height="match_parent"
                     android:background="@drawable/bg_floating_btn"
+                    android:minHeight="0dp"
+                    android:minWidth="0dp"
                     android:paddingHorizontal="14dp"
+                    android:stateListAnimator="@null"
                     android:text="Tanya AI"
+                    android:textAllCaps="false"
                     android:textColor="#FFFFFF"
                     android:textSize="12sp"
                     android:textStyle="bold" />
@@ -220,22 +234,27 @@
                     android:textColorHint="#64748B"
                     android:textSize="11.5sp" />
 
-                <Button
+                <androidx.appcompat.widget.AppCompatButton
                     android:id="@+id/btnAiSaveKey"
                     android:layout_width="wrap_content"
                     android:layout_height="36dp"
                     android:layout_marginStart="6dp"
                     android:background="@drawable/bg_floating_btn"
+                    android:minHeight="0dp"
+                    android:minWidth="0dp"
                     android:paddingHorizontal="12dp"
+                    android:stateListAnimator="@null"
                     android:text="Simpan"
+                    android:textAllCaps="false"
                     android:textColor="#FFFFFF"
                     android:textSize="11.5sp"
                     android:textStyle="bold" />
             </LinearLayout>
 
             <ScrollView
+                android:id="@+id/svAiResponse"
                 android:layout_width="match_parent"
-                android:layout_height="120dp"
+                android:layout_height="135dp"
                 android:layout_marginTop="8dp"
                 android:background="@drawable/bg_floating_card"
                 android:padding="10dp">
@@ -244,19 +263,24 @@
                     android:id="@+id/tvAiResponse"
                     android:layout_width="match_parent"
                     android:layout_height="wrap_content"
+                    android:lineSpacingExtra="2dp"
                     android:text="Hasil jawaban AI akan muncul di sini…"
                     android:textColor="#F1F5F9"
+                    android:textIsSelectable="true"
                     android:textSize="12.5sp" />
             </ScrollView>
 
-            <Button
+            <androidx.appcompat.widget.AppCompatButton
                 android:id="@+id/btnAiCopy"
-                style="?android:attr/borderlessButtonStyle"
                 android:layout_width="match_parent"
                 android:layout_height="34dp"
                 android:layout_marginTop="6dp"
                 android:background="@drawable/bg_floating_pill"
+                android:minHeight="0dp"
+                android:minWidth="0dp"
+                android:stateListAnimator="@null"
                 android:text="📋 Salin Jawaban AI"
+                android:textAllCaps="false"
                 android:textColor="#38BDF8"
                 android:textSize="12sp"
                 android:textStyle="bold" />
@@ -290,14 +314,18 @@
                     android:textColorHint="#94A3B8"
                     android:textSize="12.5sp" />
 
-                <Button
+                <androidx.appcompat.widget.AppCompatButton
                     android:id="@+id/btnGoogleSearch"
                     android:layout_width="wrap_content"
                     android:layout_height="match_parent"
                     android:layout_marginStart="6dp"
                     android:background="@drawable/bg_floating_btn"
+                    android:minHeight="0dp"
+                    android:minWidth="0dp"
                     android:paddingHorizontal="14dp"
+                    android:stateListAnimator="@null"
                     android:text="Cari"
+                    android:textAllCaps="false"
                     android:textColor="#FFFFFF"
                     android:textSize="12sp"
                     android:textStyle="bold" />
@@ -306,26 +334,35 @@
             <!-- Navigasi mini webview -->
             <LinearLayout
                 android:layout_width="match_parent"
-                android:layout_height="28dp"
+                android:layout_height="30dp"
                 android:layout_marginTop="4dp"
                 android:gravity="center_vertical"
                 android:orientation="horizontal">
 
-                <Button
+                <androidx.appcompat.widget.AppCompatButton
                     android:id="@+id/btnWebBack"
-                    style="?android:attr/borderlessButtonStyle"
-                    android:layout_width="40dp"
+                    android:layout_width="38dp"
                     android:layout_height="match_parent"
+                    android:background="@drawable/bg_floating_pill"
+                    android:minHeight="0dp"
+                    android:minWidth="0dp"
+                    android:stateListAnimator="@null"
                     android:text="←"
+                    android:textAllCaps="false"
                     android:textColor="#E2E8F0"
                     android:textSize="14sp" />
 
-                <Button
+                <androidx.appcompat.widget.AppCompatButton
                     android:id="@+id/btnWebReload"
-                    style="?android:attr/borderlessButtonStyle"
-                    android:layout_width="40dp"
+                    android:layout_width="38dp"
                     android:layout_height="match_parent"
+                    android:layout_marginStart="4dp"
+                    android:background="@drawable/bg_floating_pill"
+                    android:minHeight="0dp"
+                    android:minWidth="0dp"
+                    android:stateListAnimator="@null"
                     android:text="🔄"
+                    android:textAllCaps="false"
                     android:textColor="#E2E8F0"
                     android:textSize="12sp" />
 
@@ -333,6 +370,7 @@
                     android:id="@+id/tvWebUrl"
                     android:layout_width="0dp"
                     android:layout_height="wrap_content"
+                    android:layout_marginStart="8dp"
                     android:layout_weight="1"
                     android:ellipsize="end"
                     android:maxLines="1"
@@ -374,12 +412,13 @@
                 android:id="@+id/tvFloatingMathDesc"
                 android:layout_width="match_parent"
                 android:layout_height="wrap_content"
-                android:layout_marginTop="6dp"
+                android:layout_marginTop="5dp"
                 android:text="Pilih mode kalkulator atau materi SMP 9:"
                 android:textColor="#CBD5E1"
                 android:textSize="11.5sp" />
 
             <ScrollView
+                android:id="@+id/svMathFields"
                 android:layout_width="match_parent"
                 android:layout_height="wrap_content"
                 android:layout_marginTop="4dp"
@@ -393,35 +432,129 @@
                     android:orientation="vertical" />
             </ScrollView>
 
-            <!-- Bilah Keypad Cepat (bisa diklik langsung tanpa harus menunggu keyboard sistem) -->
-            <HorizontalScrollView
+            <!-- Bilah Keypad Cepat (Multi-baris / Bisa ketik angka, kombinasi, fungsi, huruf tanpa keyboard sistem) -->
+            <LinearLayout
+                android:id="@+id/mathQuickKeypadBox"
                 android:layout_width="match_parent"
-                android:layout_height="34dp"
+                android:layout_height="wrap_content"
                 android:layout_marginTop="6dp"
-                android:scrollbars="none">
+                android:background="@drawable/bg_floating_card"
+                android:orientation="vertical"
+                android:padding="5dp">
 
                 <LinearLayout
-                    android:id="@+id/mathQuickKeypadRow"
-                    android:layout_width="wrap_content"
-                    android:layout_height="match_parent"
+                    android:layout_width="match_parent"
+                    android:layout_height="26dp"
                     android:gravity="center_vertical"
-                    android:orientation="horizontal" />
-            </HorizontalScrollView>
+                    android:orientation="horizontal">
 
-            <Button
+                    <androidx.appcompat.widget.AppCompatButton
+                        android:id="@+id/btnKeypadPageNum"
+                        android:layout_width="wrap_content"
+                        android:layout_height="match_parent"
+                        android:background="@drawable/bg_floating_pill_on"
+                        android:minHeight="0dp"
+                        android:minWidth="0dp"
+                        android:paddingHorizontal="8dp"
+                        android:stateListAnimator="@null"
+                        android:text="123 &amp; nCr"
+                        android:textAllCaps="false"
+                        android:textColor="#FFFFFF"
+                        android:textSize="10sp"
+                        android:textStyle="bold" />
+
+                    <androidx.appcompat.widget.AppCompatButton
+                        android:id="@+id/btnKeypadPageSci"
+                        android:layout_width="wrap_content"
+                        android:layout_height="match_parent"
+                        android:layout_marginStart="4dp"
+                        android:background="@drawable/bg_floating_pill"
+                        android:minHeight="0dp"
+                        android:minWidth="0dp"
+                        android:paddingHorizontal="8dp"
+                        android:stateListAnimator="@null"
+                        android:text="f(x) &amp; x/y"
+                        android:textAllCaps="false"
+                        android:textColor="#CBD5E1"
+                        android:textSize="10sp" />
+
+                    <androidx.appcompat.widget.AppCompatButton
+                        android:id="@+id/btnKeypadPageAbc"
+                        android:layout_width="wrap_content"
+                        android:layout_height="match_parent"
+                        android:layout_marginStart="4dp"
+                        android:background="@drawable/bg_floating_pill"
+                        android:minHeight="0dp"
+                        android:minWidth="0dp"
+                        android:paddingHorizontal="8dp"
+                        android:stateListAnimator="@null"
+                        android:text="ABC"
+                        android:textAllCaps="false"
+                        android:textColor="#CBD5E1"
+                        android:textSize="10sp" />
+
+                    <View
+                        android:layout_width="0dp"
+                        android:layout_height="1dp"
+                        android:layout_weight="1" />
+
+                    <androidx.appcompat.widget.AppCompatButton
+                        android:id="@+id/btnKeypadBack"
+                        android:layout_width="36dp"
+                        android:layout_height="match_parent"
+                        android:background="@drawable/bg_floating_keypad_btn"
+                        android:minHeight="0dp"
+                        android:minWidth="0dp"
+                        android:stateListAnimator="@null"
+                        android:text="⌫"
+                        android:textAllCaps="false"
+                        android:textColor="#FCA5A5"
+                        android:textSize="12sp"
+                        android:textStyle="bold" />
+
+                    <androidx.appcompat.widget.AppCompatButton
+                        android:id="@+id/btnKeypadClear"
+                        android:layout_width="36dp"
+                        android:layout_height="match_parent"
+                        android:layout_marginStart="4dp"
+                        android:background="@drawable/bg_floating_keypad_btn"
+                        android:minHeight="0dp"
+                        android:minWidth="0dp"
+                        android:stateListAnimator="@null"
+                        android:text="AC"
+                        android:textAllCaps="false"
+                        android:textColor="#FCA5A5"
+                        android:textSize="10.5sp"
+                        android:textStyle="bold" />
+                </LinearLayout>
+
+                <LinearLayout
+                    android:id="@+id/mathQuickKeypadGrid"
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:layout_marginTop="4dp"
+                    android:orientation="vertical" />
+            </LinearLayout>
+
+            <androidx.appcompat.widget.AppCompatButton
                 android:id="@+id/btnFloatingMathSolve"
                 android:layout_width="match_parent"
                 android:layout_height="38dp"
                 android:layout_marginTop="6dp"
                 android:background="@drawable/bg_floating_btn"
+                android:minHeight="0dp"
+                android:minWidth="0dp"
+                android:stateListAnimator="@null"
                 android:text="Hitung Solusi Eksak"
+                android:textAllCaps="false"
                 android:textColor="#FFFFFF"
                 android:textSize="12.5sp"
                 android:textStyle="bold" />
 
             <ScrollView
+                android:id="@+id/svMathResult"
                 android:layout_width="match_parent"
-                android:layout_height="115dp"
+                android:layout_height="120dp"
                 android:layout_marginTop="6dp"
                 android:background="@drawable/bg_floating_card"
                 android:padding="10dp">
@@ -430,22 +563,49 @@
                     android:id="@+id/tvFloatingMathResult"
                     android:layout_width="match_parent"
                     android:layout_height="wrap_content"
+                    android:lineSpacingExtra="2dp"
                     android:text="Jawaban dan langkah eksak akan tampil di sini…"
                     android:textColor="#F8FAFC"
-                    android:textSize="12sp" />
+                    android:textIsSelectable="true"
+                    android:textSize="12.5sp" />
             </ScrollView>
 
-            <Button
-                android:id="@+id/btnFloatingMathCopy"
-                style="?android:attr/borderlessButtonStyle"
+            <LinearLayout
                 android:layout_width="match_parent"
                 android:layout_height="34dp"
                 android:layout_marginTop="6dp"
-                android:background="@drawable/bg_floating_pill"
-                android:text="📋 Salin Jawaban &amp; Langkah"
-                android:textColor="#38BDF8"
-                android:textSize="11.5sp"
-                android:textStyle="bold" />
+                android:orientation="horizontal">
+
+                <androidx.appcompat.widget.AppCompatButton
+                    android:id="@+id/btnFloatingMathExpand"
+                    android:layout_width="wrap_content"
+                    android:layout_height="match_parent"
+                    android:layout_marginEnd="6dp"
+                    android:background="@drawable/bg_floating_pill"
+                    android:minHeight="0dp"
+                    android:minWidth="0dp"
+                    android:paddingHorizontal="10dp"
+                    android:stateListAnimator="@null"
+                    android:text="🔍 Perbesar"
+                    android:textAllCaps="false"
+                    android:textColor="#E2E8F0"
+                    android:textSize="11sp" />
+
+                <androidx.appcompat.widget.AppCompatButton
+                    android:id="@+id/btnFloatingMathCopy"
+                    android:layout_width="0dp"
+                    android:layout_height="match_parent"
+                    android:layout_weight="1"
+                    android:background="@drawable/bg_floating_pill"
+                    android:minHeight="0dp"
+                    android:minWidth="0dp"
+                    android:stateListAnimator="@null"
+                    android:text="📋 Salin Jawaban &amp; Langkah"
+                    android:textAllCaps="false"
+                    android:textColor="#38BDF8"
+                    android:textSize="11.5sp"
+                    android:textStyle="bold" />
+            </LinearLayout>
         </LinearLayout>
 
         <!-- Tab 4: Auto Jawab ABCD (Aplikasi & Layar Ujian) -->
@@ -475,14 +635,17 @@
                     android:textSize="11sp"
                     android:textStyle="bold" />
 
-                <Button
+                <androidx.appcompat.widget.AppCompatButton
                     android:id="@+id/btnOpenAccSettings"
-                    style="?android:attr/borderlessButtonStyle"
                     android:layout_width="wrap_content"
                     android:layout_height="28dp"
                     android:background="@drawable/bg_floating_pill"
+                    android:minHeight="0dp"
+                    android:minWidth="0dp"
                     android:paddingHorizontal="8dp"
+                    android:stateListAnimator="@null"
                     android:text="Aktifkan Izin"
+                    android:textAllCaps="false"
                     android:textColor="#38BDF8"
                     android:textSize="10.5sp"
                     android:textStyle="bold" />
@@ -518,27 +681,33 @@
                 android:layout_marginTop="4dp"
                 android:orientation="horizontal">
 
-                <Button
+                <androidx.appcompat.widget.AppCompatButton
                     android:id="@+id/btnModeAutoClick"
-                    style="?android:attr/borderlessButtonStyle"
                     android:layout_width="0dp"
                     android:layout_height="match_parent"
                     android:layout_marginEnd="4dp"
                     android:layout_weight="1"
                     android:background="@drawable/bg_floating_pill_on"
+                    android:minHeight="0dp"
+                    android:minWidth="0dp"
+                    android:stateListAnimator="@null"
                     android:text="Auto-Klik Layar"
+                    android:textAllCaps="false"
                     android:textColor="#FFFFFF"
                     android:textSize="11sp"
                     android:textStyle="bold" />
 
-                <Button
+                <androidx.appcompat.widget.AppCompatButton
                     android:id="@+id/btnModeKeyOnly"
-                    style="?android:attr/borderlessButtonStyle"
                     android:layout_width="0dp"
                     android:layout_height="match_parent"
                     android:layout_weight="1"
                     android:background="@drawable/bg_floating_pill"
+                    android:minHeight="0dp"
+                    android:minWidth="0dp"
+                    android:stateListAnimator="@null"
                     android:text="Kunci &amp; Salin Saja"
+                    android:textAllCaps="false"
                     android:textColor="#CBD5E1"
                     android:textSize="11sp" />
             </LinearLayout>
@@ -558,51 +727,63 @@
                     android:textColor="#CBD5E1"
                     android:textSize="11sp" />
 
-                <Button
+                <androidx.appcompat.widget.AppCompatButton
                     android:id="@+id/btnDelay0"
-                    style="?android:attr/borderlessButtonStyle"
                     android:layout_width="wrap_content"
                     android:layout_height="26dp"
                     android:layout_marginStart="6dp"
                     android:background="@drawable/bg_floating_pill"
+                    android:minHeight="0dp"
+                    android:minWidth="0dp"
                     android:paddingHorizontal="6dp"
+                    android:stateListAnimator="@null"
                     android:text="0s"
+                    android:textAllCaps="false"
                     android:textColor="#CBD5E1"
                     android:textSize="10sp" />
 
-                <Button
+                <androidx.appcompat.widget.AppCompatButton
                     android:id="@+id/btnDelay1"
-                    style="?android:attr/borderlessButtonStyle"
                     android:layout_width="wrap_content"
                     android:layout_height="26dp"
                     android:layout_marginStart="4dp"
                     android:background="@drawable/bg_floating_pill_on"
+                    android:minHeight="0dp"
+                    android:minWidth="0dp"
                     android:paddingHorizontal="6dp"
+                    android:stateListAnimator="@null"
                     android:text="1.5s"
+                    android:textAllCaps="false"
                     android:textColor="#FFFFFF"
                     android:textSize="10sp" />
 
-                <Button
+                <androidx.appcompat.widget.AppCompatButton
                     android:id="@+id/btnDelay2"
-                    style="?android:attr/borderlessButtonStyle"
                     android:layout_width="wrap_content"
                     android:layout_height="26dp"
                     android:layout_marginStart="4dp"
                     android:background="@drawable/bg_floating_pill"
+                    android:minHeight="0dp"
+                    android:minWidth="0dp"
                     android:paddingHorizontal="6dp"
+                    android:stateListAnimator="@null"
                     android:text="2s"
+                    android:textAllCaps="false"
                     android:textColor="#CBD5E1"
                     android:textSize="10sp" />
 
-                <Button
+                <androidx.appcompat.widget.AppCompatButton
                     android:id="@+id/btnDelay3"
-                    style="?android:attr/borderlessButtonStyle"
                     android:layout_width="wrap_content"
                     android:layout_height="26dp"
                     android:layout_marginStart="4dp"
                     android:background="@drawable/bg_floating_pill"
+                    android:minHeight="0dp"
+                    android:minWidth="0dp"
                     android:paddingHorizontal="6dp"
+                    android:stateListAnimator="@null"
                     android:text="3s"
+                    android:textAllCaps="false"
                     android:textColor="#CBD5E1"
                     android:textSize="10sp" />
 
@@ -617,13 +798,17 @@
             </LinearLayout>
 
             <!-- Tombol Aksi Langsung -->
-            <Button
+            <androidx.appcompat.widget.AppCompatButton
                 android:id="@+id/btnTriggerScreenAnswer"
                 android:layout_width="match_parent"
                 android:layout_height="38dp"
                 android:layout_marginTop="8dp"
                 android:background="@drawable/bg_floating_btn"
+                android:minHeight="0dp"
+                android:minWidth="0dp"
+                android:stateListAnimator="@null"
                 android:text="⚡ Pindai &amp; Jawab Soal di Layar Sekarang"
+                android:textAllCaps="false"
                 android:textColor="#FFFFFF"
                 android:textSize="12sp"
                 android:textStyle="bold" />
@@ -645,15 +830,18 @@
                     android:textSize="11.5sp" />
             </ScrollView>
 
-            <Button
+            <androidx.appcompat.widget.AppCompatButton
                 android:id="@+id/btnCopyAutoAnswer"
-                style="?android:attr/borderlessButtonStyle"
                 android:layout_width="match_parent"
                 android:layout_height="32dp"
                 android:layout_marginTop="6dp"
                 android:background="@drawable/bg_floating_pill"
+                android:minHeight="0dp"
+                android:minWidth="0dp"
+                android:stateListAnimator="@null"
                 android:text="📋 Salin Kunci &amp; Penjelasan"
-                android:textColor="#38BDF8"
+                android:textAllCaps="false"
+                    android:textColor="#38BDF8"
                 android:textSize="11.5sp"
                 android:textStyle="bold" />
         </LinearLayout>

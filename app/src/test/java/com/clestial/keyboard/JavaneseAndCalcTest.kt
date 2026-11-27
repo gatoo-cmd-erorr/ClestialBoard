@@ -1,8 +1,10 @@
 package com.clestial.keyboard
 
+import com.clestial.keyboard.math.OfflineMathAssistant
 import com.clestial.keyboard.math.ScientificCalculator
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
+import org.junit.Assert.assertNotNull
 import org.junit.Assert.assertTrue
 import org.junit.Test
 
@@ -124,5 +126,25 @@ class JavaneseAndCalcTest {
 
         val badComb = ScientificCalculator.evaluate("3C5")
         assertFalse(badComb.ok)
+
+        val wordComb = ScientificCalculator.evaluate("5 kombinasi 2")
+        assertTrue(wordComb.ok)
+        assertEquals("10", wordComb.insertable)
+
+        val spaceComb = ScientificCalculator.evaluate("kombinasi 6 2")
+        assertTrue(spaceComb.ok)
+        assertEquals("15", spaceComb.insertable)
+
+        val bigComb = ScientificCalculator.evaluate("50C25")
+        assertTrue(bigComb.ok)
+        assertEquals("126410606437752", bigComb.insertable)
+
+        val offlineQ = OfflineMathAssistant.trySolveMathQuestion("berapa hasil 5C2?")
+        assertNotNull(offlineQ)
+        assertTrue(offlineQ!!.contains("10"))
+
+        val ngrasa = JavaneseScript.toJavanese("ngrasa")
+        assertEquals("ꦔ꧀ꦫꦱ", ngrasa)
+        assertEquals("ngrasa", JavaneseScript.toLatin(ngrasa))
     }
 }

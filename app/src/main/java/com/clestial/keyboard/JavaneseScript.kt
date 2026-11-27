@@ -315,11 +315,12 @@ object JavaneseScript {
                 i = appendCodaIfAny(lower, i, sb)
             } else {
                 // Konsonan mati tanpa vokal.
-                if (cons == "ng") {
+                val atWordStart = sb.isEmpty() || sb.last() == ' '
+                if (!atWordStart && cons == "ng") {
                     sb.append(CH_CECak)
-                } else if (cons == "r") {
+                } else if (!atWordStart && cons == "r") {
                     sb.append(CH_LAYAR)
-                } else if (cons == "h") {
+                } else if (!atWordStart && cons == "h") {
                     sb.append(CH_WIGNYAN)
                 } else {
                     sb.append(baseGlyph)

@@ -32,9 +32,11 @@ import android.widget.HorizontalScrollView
 import android.widget.ImageButton
 import android.widget.ImageView
 import android.widget.LinearLayout
+import android.widget.ScrollView
 import android.widget.TextView
 import android.widget.Toast
 import android.provider.Settings
+import androidx.appcompat.widget.AppCompatButton
 import androidx.appcompat.widget.SwitchCompat
 import com.clestial.keyboard.Prefs
 import com.clestial.keyboard.R
@@ -578,9 +580,9 @@ class FloatingMenuService : Service() {
             PixelFormat.TRANSLUCENT
         ).apply {
             gravity = Gravity.TOP or Gravity.CENTER_HORIZONTAL
-            y = dp(32f)
+            y = dp(12f)
             softInputMode = WindowManager.LayoutParams.SOFT_INPUT_ADJUST_PAN or
-                WindowManager.LayoutParams.SOFT_INPUT_STATE_VISIBLE
+                WindowManager.LayoutParams.SOFT_INPUT_STATE_HIDDEN
         }
 
         val imm = getSystemService(Context.INPUT_METHOD_SERVICE) as InputMethodManager
@@ -588,6 +590,8 @@ class FloatingMenuService : Service() {
             et.isFocusable = true
             et.isFocusableInTouchMode = true
             et.isEnabled = true
+            et.setTextColor(Color.parseColor("#F8FAFC"))
+            et.setHintTextColor(Color.parseColor("#94A3B8"))
             et.setOnFocusChangeListener { v, hasFocus ->
                 if (hasFocus) {
                     if (trackAsMathField) activeMathEditText = et
@@ -595,6 +599,16 @@ class FloatingMenuService : Service() {
                         imm.showSoftInput(v, InputMethodManager.SHOW_IMPLICIT)
                     }
                 }
+            }
+            et.setOnTouchListener { v, event ->
+                if (event.action == MotionEvent.ACTION_UP) {
+                    if (trackAsMathField) activeMathEditText = et
+                    v.requestFocus()
+                    mainHandler.postDelayed({
+                        imm.showSoftInput(v, InputMethodManager.SHOW_FORCED)
+                    }, 50)
+                }
+                false
             }
             et.setOnClickListener { v ->
                 if (trackAsMathField) activeMathEditText = et
@@ -858,11 +872,56 @@ class FloatingMenuService : Service() {
         // --- Tab 3: Kalkulator Umum, Kombinasi & SMP 9 Math Modules
         val mathChipContainer = popup.findViewById<LinearLayout>(R.id.mathChipsRow)
         val tvMathDesc = popup.findViewById<TextView>(R.id.tvFloatingMathDesc)
+        val svMathFields = popup.findViewById<ScrollView>(R.id.svMathFields)
         val containerMathInputs = popup.findViewById<LinearLayout>(R.id.mathFieldsContainer)
-        val quickKeypadRow = popup.findViewById<LinearLayout>(R.id.mathQuickKeypadRow)
+        val btnKeypadPageNum = popup.findViewById<AppCompatButton>(R.id.btnKeypadPageNum)
+        val btnKeypadPageSci = popup.findViewById<AppCompatButton>(R.id.btnKeypadPageSci)
+        val btnKeypadPageAbc = popup.findViewById<AppCompatButton>(R.id.btnKeypadPageAbc)
+        val btnKeypadBack = popup.findViewById<AppCompatButton>(R.id.btnKeypadBack)
+        val btnKeypadClear = popup.findViewById<AppCompatButton>(R.id.btnKeypadClear)
+        val quickKeypadGrid = popup.findViewById<LinearLayout>(R.id.mathQuickKeypadGrid)
+        val svMathResult = popup.findViewById<ScrollView>(R.id.svMathResult)
         val tvMathResult = popup.findViewById<TextView>(R.id.tvFloatingMathResult)
-        val btnMathSolve = popup.findViewById<Button>(R.id.btnFloatingMathSolve)
-        val btnMathCopy = popup.findViewById<Button>(R.id.btnFloatingMathCopy)
+        val btnMathSolve = popup.findViewById<AppCompatButton>(R.id.btnFloatingMathSolve)
+        val btnMathExpand = popup.findViewById<AppCompatButton>(R.id.btnFloatingMathExpand)
+        val btnMathCopy = popup.findViewById<AppCompatButton>(R.id.btnFloatingMathCopy)
+        val svAiResponse = popup.findViewById<ScrollView>(R.id.svAiResponse)
+
+        // Pastikan ScrollView hasil bisa digulir mulus di dalam overlay WindowManager
+        val scrollTouchAllow = View.OnTouchListener { v, ev ->
+            if (ev.action == MotionEvent.ACTION_DOWN || ev.action == MotionEvent.ACTION_MOVE) {
+                v.parent?.requestDisallowInterceptTouchEvent(true)
+            }
+            false
+        }
+        svMathResult.setOnTouchListener(scrollTouchAllow)
+        svAiResponse.setOnTouchListener(scrollTouchAllow)
+        svMathFields.setOnTouchListener(scrollTouchAllow)
+
+        var isMathResultExpanded = false
+        btnMathExpand.setOnClickListener {
+            isMathResultExpanded = !isMathResultExpanded
+            val lp = svMathResult.layoutParams
+            lp.height = dp(if (isMathResultExpanded) 235f else 120f)
+            svMathResult.layoutParams = lp
+            btnMathExpand.text = if (isMathResultExpanded) "🔽 Perkecil" else "🔍 Perbesar"
+        }
+
+        fun makeDarkBtn(labelText: String, textSizeSp: Float = 11f, textHex: String = "#F8FAFC"): AppCompatButton {
+            return AppCompatButton(themedContext).apply {
+                text = labelText
+                isAllCaps = false
+                textSize = textSizeSp
+                setTextColor(Color.parseColor(textHex))
+                backgroundTintList = null
+                stateListAnimator = null
+                minHeight = 0
+                minimumHeight = 0
+                minWidth = 0
+                minimumWidth = 0
+                gravity = Gravity.CENTER
+            }
+        }
 
         fun mathShortTitle(mod: MathModule, index: Int): String = when (mod.id) {
             "spldv" -> "1. SPLDV"
@@ -881,13 +940,17 @@ class FloatingMenuService : Service() {
 
         fun buildCalculatorUI() {
             isCalcModeSelected = true
-            tvMathDesc.text = "Kalkulator Umum, Ilmiah & Kombinasi/Permutasi (contoh: 5C2, 5P2, 5!, 2^3 + √144, sin(30))"
+            tvMathDesc.text = "Kalkulator Umum, Ilmiah & Kombinasi/Permutasi (contoh: 5C2, C(5,2), 5P2, 5!, 2^3 + √144)"
             containerMathInputs.removeAllViews()
             mathInputFields.clear()
             mathChoiceValues.clear()
             calcExprEditText = null
 
-            val label = TextView(this).apply {
+            val svLp = svMathFields.layoutParams
+            svLp.height = LinearLayout.LayoutParams.WRAP_CONTENT
+            svMathFields.layoutParams = svLp
+
+            val label = TextView(themedContext).apply {
                 text = "Ekspresi Matematika:"
                 setTextColor(Color.parseColor("#CBD5E1"))
                 textSize = 12f
@@ -897,10 +960,8 @@ class FloatingMenuService : Service() {
                 ).apply { topMargin = dp(4f) }
             }
 
-            val input = EditText(this).apply {
-                hint = "Misal: 5C2 + 3! atau (12 + 8) × 3"
-                setHintTextColor(Color.parseColor("#64748B"))
-                setTextColor(Color.parseColor("#F8FAFC"))
+            val input = EditText(themedContext).apply {
+                hint = "Misal: 5C2 + 3! atau C(6,2) atau (12 + 8) × 3"
                 setBackgroundResource(R.drawable.bg_floating_input)
                 setPadding(dp(12f), dp(10f), dp(12f), dp(10f))
                 textSize = 14f
@@ -930,23 +991,50 @@ class FloatingMenuService : Service() {
             calcExprEditText = null
             activeMathEditText = null
 
+            val svLp = svMathFields.layoutParams
+            svLp.height = if (mod.fields.size >= 3) dp(112f) else LinearLayout.LayoutParams.WRAP_CONTENT
+            svMathFields.layoutParams = svLp
+
+            val dynamicLabels = HashMap<String, TextView>()
+            fun updateProbContextLabels(modeVal: String) {
+                if (mod.id != "peluang") return
+                when (modeVal) {
+                    "Kombinasi C(n, r)" -> {
+                        dynamicLabels["a"]?.text = "Nilai n (total):"
+                        dynamicLabels["b"]?.text = "Nilai r (dipilih):"
+                    }
+                    "Permutasi P(n, r)" -> {
+                        dynamicLabels["a"]?.text = "Nilai n (total):"
+                        dynamicLabels["b"]?.text = "Nilai r (urutan):"
+                    }
+                    "Faktorial n!" -> {
+                        dynamicLabels["a"]?.text = "Nilai n:"
+                        dynamicLabels["b"]?.text = "Kosongkan:"
+                    }
+                    else -> {
+                        dynamicLabels["a"]?.text = "n(A) / P(A) / n:"
+                        dynamicLabels["b"]?.text = "n(S) / N / k / r:"
+                    }
+                }
+            }
+
             for (field in mod.fields) {
                 if (field.type == FieldType.CHOICE && field.choices.isNotEmpty()) {
-                    val col = LinearLayout(this).apply {
+                    val col = LinearLayout(themedContext).apply {
                         orientation = LinearLayout.VERTICAL
                         layoutParams = LinearLayout.LayoutParams(
                             LinearLayout.LayoutParams.MATCH_PARENT,
                             LinearLayout.LayoutParams.WRAP_CONTENT
-                        ).apply { topMargin = dp(6f) }
+                        ).apply { topMargin = dp(5f) }
                     }
 
-                    val label = TextView(this).apply {
+                    val label = TextView(themedContext).apply {
                         text = "${field.label}:"
                         setTextColor(Color.parseColor("#CBD5E1"))
                         textSize = 11.5f
                     }
 
-                    val hsv = HorizontalScrollView(this).apply {
+                    val hsv = HorizontalScrollView(themedContext).apply {
                         isHorizontalScrollBarEnabled = false
                         layoutParams = LinearLayout.LayoutParams(
                             LinearLayout.LayoutParams.MATCH_PARENT,
@@ -954,13 +1042,13 @@ class FloatingMenuService : Service() {
                         ).apply { topMargin = dp(4f) }
                     }
 
-                    val choiceRow = LinearLayout(this).apply {
+                    val choiceRow = LinearLayout(themedContext).apply {
                         orientation = LinearLayout.HORIZONTAL
                     }
 
                     val defaultVal = field.defaultValue.ifEmpty { field.choices.first() }
                     mathChoiceValues[field.key] = defaultVal
-                    val choiceButtons = ArrayList<Button>()
+                    val choiceButtons = ArrayList<AppCompatButton>()
 
                     fun renderChoicePills(selectedVal: String) {
                         for (btn in choiceButtons) {
@@ -971,19 +1059,17 @@ class FloatingMenuService : Service() {
                     }
 
                     for (ch in field.choices) {
-                        val btn = Button(this).apply {
-                            text = ch
+                        val btn = makeDarkBtn(ch, 11f, "#CBD5E1").apply {
                             tag = ch
-                            isAllCaps = false
-                            textSize = 11f
                             setPadding(dp(10f), dp(2f), dp(10f), dp(2f))
                             layoutParams = LinearLayout.LayoutParams(
                                 LinearLayout.LayoutParams.WRAP_CONTENT,
-                                dp(30f)
+                                dp(28f)
                             ).apply { marginEnd = dp(6f) }
                             setOnClickListener {
                                 mathChoiceValues[field.key] = ch
                                 renderChoicePills(ch)
+                                if (field.key == "mode") updateProbContextLabels(ch)
                             }
                         }
                         choiceButtons.add(btn)
@@ -997,16 +1083,16 @@ class FloatingMenuService : Service() {
                     continue
                 }
 
-                val row = LinearLayout(this).apply {
+                val row = LinearLayout(themedContext).apply {
                     orientation = LinearLayout.HORIZONTAL
                     gravity = Gravity.CENTER_VERTICAL
                     layoutParams = LinearLayout.LayoutParams(
                         LinearLayout.LayoutParams.MATCH_PARENT,
                         LinearLayout.LayoutParams.WRAP_CONTENT
-                    ).apply { topMargin = dp(6f) }
+                    ).apply { topMargin = dp(5f) }
                 }
 
-                val label = TextView(this).apply {
+                val label = TextView(themedContext).apply {
                     text = "${field.label}:"
                     setTextColor(Color.parseColor("#CBD5E1"))
                     textSize = 11.5f
@@ -1014,14 +1100,13 @@ class FloatingMenuService : Service() {
                         marginEnd = dp(6f)
                     }
                 }
+                dynamicLabels[field.key] = label
 
-                val input = EditText(this).apply {
+                val input = EditText(themedContext).apply {
                     setText(field.defaultValue)
                     hint = field.hint
-                    setHintTextColor(Color.parseColor("#64748B"))
-                    setTextColor(Color.parseColor("#F8FAFC"))
                     setBackgroundResource(R.drawable.bg_floating_input)
-                    setPadding(dp(10f), dp(8f), dp(10f), dp(8f))
+                    setPadding(dp(10f), dp(7f), dp(10f), dp(7f))
                     textSize = 13f
                     layoutParams = LinearLayout.LayoutParams(0, LinearLayout.LayoutParams.WRAP_CONTENT, 1.8f)
 
@@ -1039,64 +1124,97 @@ class FloatingMenuService : Service() {
                 containerMathInputs.addView(row)
                 mathInputFields[field.key] = input
             }
+            mathChoiceValues["mode"]?.let { updateProbContextLabels(it) }
             btnMathSolve.text = "Hitung Solusi Eksak"
         }
 
-        // Bilah Keypad Cepat (berfungsi meski keyboard sistem terblokir atau tidak muncul)
-        val quickKeys = listOf(
-            "⌫" to "BACK", "AC" to "CLEAR",
-            "7" to "7", "8" to "8", "9" to "9", "4" to "4", "5" to "5", "6" to "6",
-            "1" to "1", "2" to "2", "3" to "3", "0" to "0",
-            "+" to "+", "-" to "-", "×" to "×", "÷" to "÷",
-            "(" to "(", ")" to ")", "^" to "^", "√" to "√(", "!" to "!",
-            "nCr" to "C", "nPr" to "P",
-            "x" to "x", "y" to "y", "=" to "=", "<" to "<", ">" to ">",
-            "/" to "/", "," to ",", ";" to ";", "." to "."
-        )
-        for ((label, ins) in quickKeys) {
-            val kBtn = Button(this).apply {
-                text = label
-                isAllCaps = false
-                textSize = 11.5f
-                setTextColor(if (ins == "CLEAR" || ins == "BACK") Color.parseColor("#FCA5A5") else Color.parseColor("#F8FAFC"))
-                setBackgroundResource(R.drawable.bg_floating_keypad_btn)
-                setPadding(dp(8f), dp(2f), dp(8f), dp(2f))
-                minWidth = dp(34f)
-                minimumWidth = dp(34f)
-                layoutParams = LinearLayout.LayoutParams(
-                    LinearLayout.LayoutParams.WRAP_CONTENT,
-                    dp(30f)
-                ).apply { marginEnd = dp(4f) }
-
-                setOnClickListener {
-                    val targetEt = activeMathEditText
-                        ?: calcExprEditText
-                        ?: mathInputFields.values.firstOrNull()
-                        ?: return@setOnClickListener
-                    targetEt.requestFocus()
-                    val editable = targetEt.text ?: return@setOnClickListener
-                    val start = targetEt.selectionStart.coerceIn(0, editable.length)
-                    val end = targetEt.selectionEnd.coerceIn(0, editable.length)
-                    val selMin = minOf(start, end)
-                    val selMax = maxOf(start, end)
-                    when (ins) {
-                        "CLEAR" -> editable.clear()
-                        "BACK" -> {
-                            if (selMin != selMax) {
-                                editable.delete(selMin, selMax)
-                            } else if (selMin > 0) {
-                                editable.delete(selMin - 1, selMin)
-                            }
-                        }
-                        else -> editable.replace(selMin, selMax, ins)
+        // Helper sisipkan karakter/hapus ke EditText matematika aktif
+        fun applyKeypadToken(ins: String) {
+            val targetEt = activeMathEditText
+                ?: calcExprEditText
+                ?: mathInputFields.values.firstOrNull()
+                ?: return
+            targetEt.requestFocus()
+            val editable = targetEt.text ?: return
+            val start = targetEt.selectionStart.coerceIn(0, editable.length)
+            val end = targetEt.selectionEnd.coerceIn(0, editable.length)
+            val selMin = minOf(start, end)
+            val selMax = maxOf(start, end)
+            when (ins) {
+                "CLEAR" -> editable.clear()
+                "BACK" -> {
+                    if (selMin != selMax) {
+                        editable.delete(selMin, selMax)
+                    } else if (selMin > 0) {
+                        editable.delete(selMin - 1, selMin)
                     }
                 }
+                else -> editable.replace(selMin, selMax, ins)
             }
-            quickKeypadRow.addView(kBtn)
         }
 
+        btnKeypadBack.setOnClickListener { applyKeypadToken("BACK") }
+        btnKeypadClear.setOnClickListener { applyKeypadToken("CLEAR") }
+
+        fun renderKeypadPage(page: Int) {
+            btnKeypadPageNum.setBackgroundResource(if (page == 0) R.drawable.bg_floating_pill_on else R.drawable.bg_floating_pill)
+            btnKeypadPageNum.setTextColor(if (page == 0) Color.WHITE else Color.parseColor("#CBD5E1"))
+            btnKeypadPageSci.setBackgroundResource(if (page == 1) R.drawable.bg_floating_pill_on else R.drawable.bg_floating_pill)
+            btnKeypadPageSci.setTextColor(if (page == 1) Color.WHITE else Color.parseColor("#CBD5E1"))
+            btnKeypadPageAbc.setBackgroundResource(if (page == 2) R.drawable.bg_floating_pill_on else R.drawable.bg_floating_pill)
+            btnKeypadPageAbc.setTextColor(if (page == 2) Color.WHITE else Color.parseColor("#CBD5E1"))
+
+            val keyRows: List<List<Pair<String, String>>> = when (page) {
+                0 -> listOf(
+                    listOf("7" to "7", "8" to "8", "9" to "9", "÷" to "÷", "×" to "×", "nCr" to "C", "nPr" to "P"),
+                    listOf("4" to "4", "5" to "5", "6" to "6", "-" to "-", "+" to "+", "!" to "!", "√" to "√("),
+                    listOf("1" to "1", "2" to "2", "3" to "3", "0" to "0", "(" to "(", ")" to ")", "," to ",")
+                )
+                1 -> listOf(
+                    listOf("x" to "x", "y" to "y", "=" to "=", "<" to "<", ">" to ">", "≤" to "<=", "≥" to ">="),
+                    listOf("^" to "^", "x²" to "²", "x³" to "³", "π" to "π", ";" to ";", "/" to "/", "." to "."),
+                    listOf("sin" to "sin(", "cos" to "cos(", "tan" to "tan(", "log" to "log(", "ln" to "ln(", "%" to "%", "abs" to "abs(")
+                )
+                else -> listOf(
+                    listOf("q" to "q", "w" to "w", "e" to "e", "r" to "r", "t" to "t", "y" to "y", "u" to "u", "i" to "i", "o" to "o", "p" to "p"),
+                    listOf("a" to "a", "s" to "s", "d" to "d", "f" to "f", "g" to "g", "h" to "h", "j" to "j", "k" to "k", "l" to "l", "␣" to " "),
+                    listOf("z" to "z", "x" to "x", "c" to "c", "v" to "v", "b" to "b", "n" to "n", "m" to "m", "," to ",", "." to ".", "-" to "-")
+                )
+            }
+
+            quickKeypadGrid.removeAllViews()
+            keyRows.forEachIndexed { rIdx, rList ->
+                val rowLl = LinearLayout(themedContext).apply {
+                    orientation = LinearLayout.HORIZONTAL
+                    layoutParams = LinearLayout.LayoutParams(
+                        LinearLayout.LayoutParams.MATCH_PARENT,
+                        dp(28f)
+                    ).apply { if (rIdx > 0) topMargin = dp(3f) }
+                }
+                rList.forEachIndexed { cIdx, (lbl, ins) ->
+                    val btn = makeDarkBtn(lbl, if (page == 2) 11f else 11.5f, "#F8FAFC").apply {
+                        setBackgroundResource(R.drawable.bg_floating_keypad_btn)
+                        setPadding(dp(2f), 0, dp(2f), 0)
+                        layoutParams = LinearLayout.LayoutParams(
+                            0,
+                            LinearLayout.LayoutParams.MATCH_PARENT,
+                            1f
+                        ).apply { if (cIdx > 0) marginStart = dp(3f) }
+                        setOnClickListener { applyKeypadToken(ins) }
+                    }
+                    rowLl.addView(btn)
+                }
+                quickKeypadGrid.addView(rowLl)
+            }
+        }
+
+        btnKeypadPageNum.setOnClickListener { renderKeypadPage(0) }
+        btnKeypadPageSci.setOnClickListener { renderKeypadPage(1) }
+        btnKeypadPageAbc.setOnClickListener { renderKeypadPage(2) }
+        renderKeypadPage(0)
+
         // Buat chip: 0. Kalkulator + 11 modul SMP 9
-        val allChipButtons = ArrayList<Button>()
+        val allChipButtons = ArrayList<AppCompatButton>()
         fun highlightChip(selectedIdx: Int) {
             allChipButtons.forEachIndexed { i, btn ->
                 btn.setBackgroundResource(if (i == selectedIdx) R.drawable.bg_floating_pill_on else R.drawable.bg_floating_pill)
@@ -1104,14 +1222,11 @@ class FloatingMenuService : Service() {
             }
         }
 
-        val calcChip = Button(this).apply {
-            text = "0. KALKULATOR"
-            isAllCaps = false
-            textSize = 11f
-            setPadding(dp(12f), dp(4f), dp(12f), dp(4f))
+        val calcChip = makeDarkBtn("0. KALKULATOR", 11f, "#FFFFFF").apply {
+            setPadding(dp(12f), dp(2f), dp(12f), dp(2f))
             layoutParams = LinearLayout.LayoutParams(
                 LinearLayout.LayoutParams.WRAP_CONTENT,
-                dp(32f)
+                dp(30f)
             ).apply { marginEnd = dp(6f) }
             setOnClickListener {
                 highlightChip(0)
@@ -1123,14 +1238,11 @@ class FloatingMenuService : Service() {
 
         MathRegistry.modules.forEachIndexed { index, mod ->
             val chipIdx = index + 1
-            val chip = Button(this).apply {
-                text = mathShortTitle(mod, index)
-                isAllCaps = false
-                textSize = 11f
-                setPadding(dp(12f), dp(4f), dp(12f), dp(4f))
+            val chip = makeDarkBtn(mathShortTitle(mod, index), 11f, "#CBD5E1").apply {
+                setPadding(dp(12f), dp(2f), dp(12f), dp(2f))
                 layoutParams = LinearLayout.LayoutParams(
                     LinearLayout.LayoutParams.WRAP_CONTENT,
-                    dp(32f)
+                    dp(30f)
                 ).apply { marginEnd = dp(6f) }
 
                 setOnClickListener {

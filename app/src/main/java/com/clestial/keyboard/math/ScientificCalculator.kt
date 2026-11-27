@@ -71,6 +71,12 @@ object ScientificCalculator {
                 }
             }
 
+            // Cek kombinasi / permutasi / faktorial murni agar nilai BigInteger besar tetap presisi eksak.
+            val directCombPerm = tryDirectCombPermOrFact(expr)
+            if (directCombPerm != null) {
+                return directCombPerm
+            }
+
             // Cek evaluasi eksak rasional murni terlebih dahulu jika tidak memakai fungsi ilmiah.
             val parser = ExprParser(expr, degreeMode)
             val value = parser.parse()
@@ -92,6 +98,60 @@ object ScientificCalculator {
         } catch (e: Exception) {
             CalcOutput(false, error = "Format ekspresi salah")
         }
+    }
+
+    private fun tryDirectCombPermOrFact(raw: String): CalcOutput? {
+        val trimmed = raw.trim()
+        val infixMatch = Regex("""^(\d+)\s*(kombinasi|permutasi|ncr|npr|c|p)\s*(\d+)$""", RegexOption.IGNORE_CASE)
+            .matchEntire(trimmed)
+        if (infixMatch != null) {
+            val n = infixMatch.groupValues[1].toIntOrNull() ?: return null
+            val op = infixMatch.groupValues[2].lowercase()
+            val r = infixMatch.groupValues[3].toIntOrNull() ?: return null
+            if (n > 500 || r > 500) throw IllegalArgumentException("Nilai maksimal 500")
+            val big = if (op in setOf("c", "ncr", "kombinasi")) exactComb(n, r) else exactPerm(n, r)
+            return CalcOutput(true, big.toString(), big.toString())
+        }
+        val fnMatch = Regex("""^(kombinasi|permutasi|ncr|npr|c|p)\s*(?:\(\s*(\d+)\s*[,;]\s*(\d+)\s*\)|\s+(\d+)\s+(\d+))$""", RegexOption.IGNORE_CASE)
+            .matchEntire(trimmed)
+        if (fnMatch != null) {
+            val op = fnMatch.groupValues[1].lowercase()
+            val nStr = fnMatch.groupValues[2].ifEmpty { fnMatch.groupValues[4] }
+            val rStr = fnMatch.groupValues[3].ifEmpty { fnMatch.groupValues[5] }
+            val n = nStr.toIntOrNull() ?: return null
+            val r = rStr.toIntOrNull() ?: return null
+            if (n > 500 || r > 500) throw IllegalArgumentException("Nilai maksimal 500")
+            val big = if (op in setOf("c", "ncr", "kombinasi")) exactComb(n, r) else exactPerm(n, r)
+            return CalcOutput(true, big.toString(), big.toString())
+        }
+        val factMatch = Regex("""^(\d+)\s*!$""").matchEntire(trimmed)
+        if (factMatch != null) {
+            val n = factMatch.groupValues[1].toIntOrNull() ?: return null
+            if (n > 500) throw IllegalArgumentException("Nilai n maksimal 500")
+            var res = BigInteger.ONE
+            for (i in 2..n) res = res.multiply(BigInteger.valueOf(i.toLong()))
+            return CalcOutput(true, res.toString(), res.toString())
+        }
+        return null
+    }
+
+    private fun exactComb(n: Int, r: Int): BigInteger {
+        if (r > n) throw IllegalArgumentException("Untuk kombinasi C(n, r), nilai r ($r) tidak boleh > n ($n)")
+        val k = minOf(r, n - r)
+        var res = BigInteger.ONE
+        for (i in 1..k) {
+            res = res.multiply(BigInteger.valueOf((n - k + i).toLong())).divide(BigInteger.valueOf(i.toLong()))
+        }
+        return res
+    }
+
+    private fun exactPerm(n: Int, r: Int): BigInteger {
+        if (r > n) throw IllegalArgumentException("Untuk permutasi P(n, r), nilai r ($r) tidak boleh > n ($n)")
+        var res = BigInteger.ONE
+        for (i in 0 until r) {
+            res = res.multiply(BigInteger.valueOf((n - i).toLong()))
+        }
+        return res
     }
 
     private fun tryExactRational(expr: String): ExactFraction? {
@@ -362,7 +422,16 @@ object ScientificCalculator {
         }
 
         private fun normalize(raw: String): String {
-            var base = raw.replace(" ", "")
+            var pre = raw.trim()
+            val prefixSpace = Regex("""^\s*(kombinasi|permutasi|ncr|npr|c|p)\s+(\d+)\s+(\d+)\s*$""", RegexOption.IGNORE_CASE)
+                .matchEntire(pre)
+            if (prefixSpace != null) {
+                pre = "${prefixSpace.groupValues[1]}(${prefixSpace.groupValues[2]},${prefixSpace.groupValues[3]})"
+            }
+            pre = pre.replace(Regex("""(?<=[\d\)\!])\s*kombinasi\s*(?=[\d\(])""", RegexOption.IGNORE_CASE), "C")
+                .replace(Regex("""(?<=[\d\)\!])\s*permutasi\s*(?=[\d\(])""", RegexOption.IGNORE_CASE), "P")
+
+            var base = pre.replace(" ", "")
                 .replace('×', '*')
                 .replace('÷', '/')
                 .replace(':', '/')

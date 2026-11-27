@@ -34,10 +34,21 @@ object OfflineMathAssistant {
             }
         }
 
-        // 4. Cek ekspresi kalkulator langsung (termasuk 5C2, 5P2, 5!, akar, pangkat)
-        val calcRes = ScientificCalculator.evaluate(text, degreeMode = true)
-        if (calcRes.ok) {
-            return "🧮 Hasil Kalkulator (Offline Eksak):\nJawaban: ${calcRes.display}"
+        // 4. Cek ekspresi kalkulator langsung (termasuk 5C2, C(5,2), 5 kombinasi 2, 5P2, 5!, akar, pangkat)
+        val directCalc = ScientificCalculator.evaluate(text, degreeMode = true)
+        if (directCalc.ok) {
+            return "🧮 Hasil Kalkulator (Offline Eksak):\nJawaban: ${directCalc.display}"
+        }
+        val strippedCalc = text
+            .replace(Regex("""\b(berapa|hasil|hitung|hitunglah|nilai|tentukan|dari|adalah)\b""", RegexOption.IGNORE_CASE), " ")
+            .replace("?", "")
+            .replace("=", "")
+            .trim()
+        if (strippedCalc.isNotEmpty() && strippedCalc != text) {
+            val calcRes2 = ScientificCalculator.evaluate(strippedCalc, degreeMode = true)
+            if (calcRes2.ok) {
+                return "🧮 Hasil Kalkulator (Offline Eksak):\nEkspresi: $strippedCalc\nJawaban: ${calcRes2.display}"
+            }
         }
 
         return null
