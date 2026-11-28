@@ -729,6 +729,29 @@
                     android:layout_height="wrap_content" />
             </LinearLayout>
 
+            <!-- Toggle Sembunyikan Navigasi (Immersive Mode) -->
+            <LinearLayout
+                android:layout_width="match_parent"
+                android:layout_height="34dp"
+                android:layout_marginTop="2dp"
+                android:gravity="center_vertical"
+                android:orientation="horizontal">
+
+                <TextView
+                    android:layout_width="0dp"
+                    android:layout_height="wrap_content"
+                    android:layout_weight="1"
+                    android:text="Sembunyikan Navigasi"
+                    android:textColor="#F8FAFC"
+                    android:textSize="12sp"
+                    android:textStyle="bold" />
+
+                <androidx.appcompat.widget.SwitchCompat
+                    android:id="@+id/switchHideNavigation"
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content" />
+            </LinearLayout>
+
             <!-- Baris 4: Dua tombol mode Auto-Klik Layar vs Kunci & Salin Saja -->
             <LinearLayout
                 android:layout_width="match_parent"

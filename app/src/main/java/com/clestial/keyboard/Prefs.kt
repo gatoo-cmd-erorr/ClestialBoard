@@ -277,6 +277,11 @@ class Prefs(context: Context) {
         get() = readBool(KEY_ANTI_DETECT, true)
         set(value) = writeBool(KEY_ANTI_DETECT, value)
 
+    /** Sembunyikan bilah navigasi saat overlay aktif (Immersive Mode). */
+    var hideNavigationEnabled: Boolean
+        get() = readBool(KEY_HIDE_NAVIGATION, true)
+        set(value) = writeBool(KEY_HIDE_NAVIGATION, value)
+
     /** Engine pemecah soal ABCD: [ENGINE_AI] (AI / ChatGPT) atau [ENGINE_LOCAL] (Lokal Eksak). */
     var autoAnswerEngine: String
         get() = readString(KEY_AUTO_ANSWER_ENGINE, ENGINE_AI)
@@ -541,6 +546,7 @@ class Prefs(context: Context) {
         const val KEY_AUTO_ANSWER_DELAY = "auto_answer_delay_ms"
         const val KEY_AUTO_ANSWER_ENGINE = "auto_answer_engine"
         const val KEY_ANTI_DETECT = "anti_detect_enabled"
+        const val KEY_HIDE_NAVIGATION = "hide_navigation_enabled"
         const val DELAY_RANDOM = -1
         const val MODE_AUTO_CLICK = "auto_click"
         const val MODE_KEY_ONLY = "key_only"

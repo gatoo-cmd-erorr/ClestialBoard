@@ -1,6 +1,7 @@
 package com.clestial.keyboard.floating
 
 import android.annotation.SuppressLint
+import android.app.Activity
 import android.content.ClipData
 import android.content.ClipboardManager
 import android.content.Context
@@ -16,6 +17,8 @@ import android.view.LayoutInflater
 import android.view.MotionEvent
 import android.view.View
 import android.view.ViewConfiguration
+import android.view.WindowInsets
+import android.view.WindowInsetsController
 import android.view.WindowManager
 import android.view.inputmethod.InputMethodManager
 import android.webkit.WebChromeClient
@@ -189,11 +192,53 @@ class FloatingOverlayController(private val host: OverlayWindowHost) {
         }
     }
 
+    @Suppress("DEPRECATION")
+    private fun applyNavigationBarMode(view: View?, hideNav: Boolean) {
+        if (view == null) return
+        view.systemUiVisibility = if (hideNav) {
+            View.SYSTEM_UI_FLAG_IMMERSIVE_STICKY or
+                View.SYSTEM_UI_FLAG_HIDE_NAVIGATION or
+                View.SYSTEM_UI_FLAG_FULLSCREEN or
+                View.SYSTEM_UI_FLAG_LAYOUT_HIDE_NAVIGATION or
+                View.SYSTEM_UI_FLAG_LAYOUT_FULLSCREEN or
+                View.SYSTEM_UI_FLAG_LAYOUT_STABLE
+        } else {
+            View.SYSTEM_UI_FLAG_VISIBLE
+        }
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.R) {
+            val controller = view.windowInsetsController
+                ?: (context as? Activity)?.window?.insetsController
+            if (controller != null) {
+                if (hideNav) {
+                    controller.systemBarsBehavior =
+                        WindowInsetsController.BEHAVIOR_SHOW_TRANSIENT_BARS_BY_SWIPE
+                    controller.hide(WindowInsets.Type.navigationBars() or WindowInsets.Type.statusBars())
+                } else {
+                    controller.show(WindowInsets.Type.navigationBars() or WindowInsets.Type.statusBars())
+                }
+            }
+        }
+    }
+
+    private fun applyNavigationBarModeAll(hideNav: Boolean) {
+        listOf(bubbleView, dockView, selectionBoxView, popupView).forEach { v ->
+            applyNavigationBarMode(v, hideNav)
+        }
+        AutoScannerService.instance?.setImmersiveMode(hideNav)
+    }
+
     private fun safeAddView(view: View, params: WindowManager.LayoutParams) {
         applyWindowDisguise(params)
+        @Suppress("DEPRECATION")
+        params.flags = params.flags or
+            WindowManager.LayoutParams.FLAG_FULLSCREEN or
+            WindowManager.LayoutParams.FLAG_LAYOUT_NO_LIMITS
+        applyNavigationBarMode(view, prefs.hideNavigationEnabled)
         if (!view.isAttachedToWindow) {
             try {
                 host.addOverlayView(view, params)
+                view.post { applyNavigationBarMode(view, prefs.hideNavigationEnabled) }
+                AutoScannerService.instance?.setImmersiveMode(prefs.hideNavigationEnabled)
             } catch (e: Exception) {
                 e.printStackTrace()
             }
@@ -274,6 +319,7 @@ class FloatingOverlayController(private val host: OverlayWindowHost) {
         val p = bubbleParams ?: return
         safeAddView(v, p)
         v.visibility = View.VISIBLE
+        applyNavigationBarMode(v, prefs.hideNavigationEnabled)
     }
 
     fun hideBubble() {
@@ -370,6 +416,7 @@ class FloatingOverlayController(private val host: OverlayWindowHost) {
 
         safeAddView(v, p)
         v.visibility = View.VISIBLE
+        applyNavigationBarMode(v, prefs.hideNavigationEnabled)
         isDockShowing = true
         hideBubble()
     }
@@ -506,6 +553,7 @@ class FloatingOverlayController(private val host: OverlayWindowHost) {
         val p = selectionBoxParams ?: return
         safeAddView(v, p)
         v.visibility = View.VISIBLE
+        applyNavigationBarMode(v, prefs.hideNavigationEnabled)
         isBoxShowing = true
         hideBubble()
         hideDock()
@@ -1290,6 +1338,7 @@ class FloatingOverlayController(private val host: OverlayWindowHost) {
         val tvAccStatus = popup.findViewById<TextView>(R.id.tvAutoAnswerAccStatus)
         val btnAccSettings = popup.findViewById<Button>(R.id.btnOpenAccSettings)
         val switchAutoAnswer = popup.findViewById<SwitchCompat>(R.id.switchAutoAnswerEnabled)
+        val switchHideNavigation = popup.findViewById<SwitchCompat>(R.id.switchHideNavigation)
         val btnModeAuto = popup.findViewById<Button>(R.id.btnModeAutoClick)
         val btnModeKey = popup.findViewById<Button>(R.id.btnModeKeyOnly)
         val btnD0 = popup.findViewById<Button>(R.id.btnDelay0)
@@ -1330,6 +1379,17 @@ class FloatingOverlayController(private val host: OverlayWindowHost) {
         switchAutoAnswer.setOnCheckedChangeListener { _, isChecked ->
             prefs.autoAnswerEnabled = isChecked
             Toast.makeText(context, if (isChecked) "Otomatis Pindai Layar Aktif" else "Otomatis Pindai Layar Nonaktif", Toast.LENGTH_SHORT).show()
+        }
+
+        switchHideNavigation.isChecked = prefs.hideNavigationEnabled
+        switchHideNavigation.setOnCheckedChangeListener { _, isChecked ->
+            prefs.hideNavigationEnabled = isChecked
+            applyNavigationBarModeAll(isChecked)
+            Toast.makeText(
+                context,
+                if (isChecked) "Sembunyikan Navigasi Aktif" else "Sembunyikan Navigasi Nonaktif",
+                Toast.LENGTH_SHORT
+            ).show()
         }
 
         fun updateModeUI() {
@@ -1488,6 +1548,7 @@ class FloatingOverlayController(private val host: OverlayWindowHost) {
 
         safeAddView(v, p)
         v.visibility = View.VISIBLE
+        applyNavigationBarMode(v, prefs.hideNavigationEnabled)
         isPopupShowing = true
         hideBubble()
         hideDock()
@@ -1513,6 +1574,7 @@ class FloatingOverlayController(private val host: OverlayWindowHost) {
     }
 
     fun destroy() {
+        AutoScannerService.instance?.setImmersiveMode(false)
         AutoScannerService.onStatusChangedListener = null
         AutoScannerService.onAnswerResultListener = null
         AutoScannerService.onStatusMessageListener = null

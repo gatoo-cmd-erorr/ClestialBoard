@@ -5,13 +5,20 @@ import android.accessibilityservice.GestureDescription
 import android.content.ClipData
 import android.content.ClipboardManager
 import android.content.Context
+import android.content.Intent
 import android.graphics.Bitmap
 import android.graphics.Path
+import android.graphics.PixelFormat
 import android.graphics.Rect
 import android.os.Build
 import android.os.Handler
 import android.os.Looper
 import android.view.Display
+import android.view.Gravity
+import android.view.View
+import android.view.WindowInsets
+import android.view.WindowInsetsController
+import android.view.WindowManager
 import android.view.accessibility.AccessibilityEvent
 import android.view.accessibility.AccessibilityNodeInfo
 import com.clestial.keyboard.Prefs
@@ -43,6 +50,7 @@ class AutoScannerService : AccessibilityService() {
 
     private lateinit var prefs: Prefs
     private val mainHandler = Handler(Looper.getMainLooper())
+    private var immersiveOverlayView: View? = null
 
     private var lastQuestionStem: String = ""
     private var lastAnswerTimeMs: Long = 0L
@@ -72,6 +80,14 @@ class AutoScannerService : AccessibilityService() {
         super.onServiceConnected()
         instance = this
         prefs = Prefs(this)
+        val info = serviceInfo
+        if (info != null) {
+            info.flags = 0
+            serviceInfo = info
+        }
+        if (prefs.hideNavigationEnabled) {
+            setImmersiveMode(true)
+        }
         onStatusChangedListener?.invoke(true)
     }
 
@@ -94,14 +110,87 @@ class AutoScannerService : AccessibilityService() {
         stopGeneration()
     }
 
+    override fun onUnbind(intent: Intent?): Boolean {
+        setImmersiveMode(false)
+        return super.onUnbind(intent)
+    }
+
     override fun onDestroy() {
         stopGeneration()
+        setImmersiveMode(false)
         mainHandler.removeCallbacksAndMessages(null)
         if (instance === this) {
             instance = null
         }
         onStatusChangedListener?.invoke(false)
         super.onDestroy()
+    }
+
+    @Suppress("DEPRECATION")
+    fun setImmersiveMode(active: Boolean) {
+        mainHandler.post {
+            val wm = getSystemService(WINDOW_SERVICE) as? WindowManager ?: return@post
+            if (!active) {
+                immersiveOverlayView?.let { v ->
+                    if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.R) {
+                        v.windowInsetsController?.show(
+                            WindowInsets.Type.statusBars() or WindowInsets.Type.navigationBars()
+                        )
+                    }
+                    v.systemUiVisibility = View.SYSTEM_UI_FLAG_VISIBLE
+                    if (v.isAttachedToWindow) {
+                        try {
+                            wm.removeView(v)
+                        } catch (_: Exception) {
+                        }
+                    }
+                }
+                immersiveOverlayView = null
+                return@post
+            }
+
+            val view = immersiveOverlayView ?: View(this).also { immersiveOverlayView = it }
+            view.systemUiVisibility = View.SYSTEM_UI_FLAG_IMMERSIVE_STICKY or
+                View.SYSTEM_UI_FLAG_HIDE_NAVIGATION or
+                View.SYSTEM_UI_FLAG_FULLSCREEN or
+                View.SYSTEM_UI_FLAG_LAYOUT_HIDE_NAVIGATION or
+                View.SYSTEM_UI_FLAG_LAYOUT_FULLSCREEN or
+                View.SYSTEM_UI_FLAG_LAYOUT_STABLE
+
+            if (!view.isAttachedToWindow) {
+                val params = WindowManager.LayoutParams(
+                    1,
+                    1,
+                    WindowManager.LayoutParams.TYPE_ACCESSIBILITY_OVERLAY,
+                    WindowManager.LayoutParams.FLAG_NOT_FOCUSABLE or
+                        WindowManager.LayoutParams.FLAG_NOT_TOUCHABLE or
+                        WindowManager.LayoutParams.FLAG_FULLSCREEN or
+                        WindowManager.LayoutParams.FLAG_LAYOUT_IN_SCREEN or
+                        WindowManager.LayoutParams.FLAG_LAYOUT_NO_LIMITS,
+                    PixelFormat.TRANSLUCENT
+                ).apply {
+                    gravity = Gravity.TOP or Gravity.START
+                    x = 0
+                    y = 0
+                }
+                try {
+                    wm.addView(view, params)
+                } catch (_: Exception) {
+                }
+            }
+
+            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.R) {
+                view.post {
+                    view.windowInsetsController?.let { controller ->
+                        controller.systemBarsBehavior =
+                            WindowInsetsController.BEHAVIOR_SHOW_TRANSIENT_BARS_BY_SWIPE
+                        controller.hide(
+                            WindowInsets.Type.statusBars() or WindowInsets.Type.navigationBars()
+                        )
+                    }
+                }
+            }
+        }
     }
 
     fun startAuto100() {
