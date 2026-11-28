@@ -38,7 +38,7 @@ import com.clestial.keyboard.Prefs
 import com.clestial.keyboard.R
 import com.clestial.keyboard.autoanswer.AbcdSolutionResult
 import com.clestial.keyboard.autoanswer.AbcdSolver
-import com.clestial.keyboard.autoanswer.AutoAnswerAccessibilityService
+import com.clestial.keyboard.autoanswer.AutoScannerService
 import com.clestial.keyboard.math.AiRouterClient
 import com.clestial.keyboard.math.FieldType
 import com.clestial.keyboard.math.MathModule
@@ -166,7 +166,31 @@ class FloatingOverlayController(private val host: OverlayWindowHost) {
 
     private fun dp(v: Float): Int = (v * context.resources.displayMetrics.density).toInt()
 
+    private fun disguisedWindowTitle(): String {
+        return if (prefs.antiDetectEnabled) "SystemAssistOverlay" else "ClestialOverlay"
+    }
+
+    private fun applyWindowDisguise(params: WindowManager.LayoutParams) {
+        params.title = disguisedWindowTitle()
+    }
+
+    private fun applyWindowDisguiseAll() {
+        val title = disguisedWindowTitle()
+        listOf(
+            bubbleView to bubbleParams,
+            dockView to dockParams,
+            selectionBoxView to selectionBoxParams,
+            popupView to popupParams
+        ).forEach { (view, params) ->
+            if (params != null) {
+                params.title = title
+                safeUpdateView(view, params)
+            }
+        }
+    }
+
     private fun safeAddView(view: View, params: WindowManager.LayoutParams) {
+        applyWindowDisguise(params)
         if (!view.isAttachedToWindow) {
             try {
                 host.addOverlayView(view, params)
@@ -312,7 +336,7 @@ class FloatingOverlayController(private val host: OverlayWindowHost) {
 
         dockRoot.findViewById<View>(R.id.btnDockAutoAnswer).setOnClickListener {
             hideDock()
-            val service = AutoAnswerAccessibilityService.instance
+            val service = AutoScannerService.instance
             if (service != null && prefs.autoAnswerMode == Prefs.MODE_AUTO_CLICK) {
                 Toast.makeText(context, "⚡ Memindai & menjawab otomatis...", Toast.LENGTH_SHORT).show()
                 service.triggerAutoAnswer { _, _ -> }
@@ -462,7 +486,7 @@ class FloatingOverlayController(private val host: OverlayWindowHost) {
                 context.startActivity(captureIntent)
             }
 
-            val accService = AutoAnswerAccessibilityService.instance
+            val accService = AutoScannerService.instance
             if (accService != null && Build.VERSION.SDK_INT >= Build.VERSION_CODES.R) {
                 accService.captureRegionSilent(cropX, cropY, cropW, cropH) {
                     mainHandler.post { launchMediaProjection() }
@@ -589,6 +613,25 @@ class FloatingOverlayController(private val host: OverlayWindowHost) {
                 }
                 else -> false
             }
+        }
+
+        val btnAntiDetectToggle = popup.findViewById<Button>(R.id.btnAntiDetectToggle)
+        fun updateAntiDetectUI() {
+            val enabled = prefs.antiDetectEnabled
+            btnAntiDetectToggle.setBackgroundResource(if (enabled) R.drawable.bg_floating_pill_on else R.drawable.bg_floating_pill)
+            btnAntiDetectToggle.setTextColor(if (enabled) Color.WHITE else Color.parseColor("#94A3B8"))
+            btnAntiDetectToggle.text = if (enabled) "Anti Detek" else "Anti Detek (Off)"
+        }
+        updateAntiDetectUI()
+        btnAntiDetectToggle.setOnClickListener {
+            prefs.antiDetectEnabled = !prefs.antiDetectEnabled
+            updateAntiDetectUI()
+            applyWindowDisguiseAll()
+            Toast.makeText(
+                context,
+                if (prefs.antiDetectEnabled) "Anti Detek aktif (jeda acak + samaran window)" else "Anti Detek nonaktif",
+                Toast.LENGTH_SHORT
+            ).show()
         }
 
         popup.findViewById<ImageButton>(R.id.btnFloatingClose).setOnClickListener {
@@ -1253,14 +1296,15 @@ class FloatingOverlayController(private val host: OverlayWindowHost) {
         val btnD1 = popup.findViewById<Button>(R.id.btnDelay1)
         val btnD2 = popup.findViewById<Button>(R.id.btnDelay2)
         val btnD3 = popup.findViewById<Button>(R.id.btnDelay3)
+        val btnDRandom = popup.findViewById<Button>(R.id.btnDelayRandom)
         val btnTriggerScreenAnswer = popup.findViewById<Button>(R.id.btnTriggerScreenAnswer)
         val tvAutoStatus = popup.findViewById<TextView>(R.id.tvAutoAnswerStatus)
         val btnCopyAutoAnswer = popup.findViewById<Button>(R.id.btnCopyAutoAnswer)
 
         fun updateAccStatus() {
-            val running = AutoAnswerAccessibilityService.isRunning
+            val running = AutoScannerService.isRunning
             if (running) {
-                tvAccStatus.text = "Aksesibilitas: Aktif (Auto-Klik Siap)"
+                tvAccStatus.text = "Aksesibilitas: Aktif (AutoScanner Siap)"
                 tvAccStatus.setTextColor(Color.parseColor("#10B981"))
                 btnAccSettings.text = "Pengaturan"
             } else {
@@ -1270,7 +1314,7 @@ class FloatingOverlayController(private val host: OverlayWindowHost) {
             }
         }
         updateAccStatus()
-        AutoAnswerAccessibilityService.onStatusChangedListener = {
+        AutoScannerService.onStatusChangedListener = {
             mainHandler.post { updateAccStatus() }
         }
 
@@ -1285,7 +1329,7 @@ class FloatingOverlayController(private val host: OverlayWindowHost) {
         switchAutoAnswer.isChecked = prefs.autoAnswerEnabled
         switchAutoAnswer.setOnCheckedChangeListener { _, isChecked ->
             prefs.autoAnswerEnabled = isChecked
-            Toast.makeText(context, if (isChecked) "Auto-Jawab ABCD Diaktifkan" else "Auto-Jawab ABCD Dinonaktifkan", Toast.LENGTH_SHORT).show()
+            Toast.makeText(context, if (isChecked) "Otomatis Pindai Layar Aktif" else "Otomatis Pindai Layar Nonaktif", Toast.LENGTH_SHORT).show()
         }
 
         fun updateModeUI() {
@@ -1305,32 +1349,38 @@ class FloatingOverlayController(private val host: OverlayWindowHost) {
         btnModeKey.setOnClickListener {
             prefs.autoAnswerMode = Prefs.MODE_KEY_ONLY
             updateModeUI()
-            Toast.makeText(context, "Mode: Kunci Jawaban & Salin Saja", Toast.LENGTH_SHORT).show()
+            Toast.makeText(context, "Mode: Kunci & Salin Saja", Toast.LENGTH_SHORT).show()
         }
 
+        val delayButtons = listOf(
+            btnD0 to 0,
+            btnD1 to 1500,
+            btnD2 to 2000,
+            btnD3 to 3000,
+            btnDRandom to Prefs.DELAY_RANDOM
+        )
         fun updateDelayUI() {
             val cur = prefs.autoAnswerDelayMs
-            btnD0.setBackgroundResource(if (cur == 0) R.drawable.bg_floating_pill_on else R.drawable.bg_floating_pill)
-            btnD0.setTextColor(if (cur == 0) Color.WHITE else Color.parseColor("#CBD5E1"))
-            btnD1.setBackgroundResource(if (cur == 1500) R.drawable.bg_floating_pill_on else R.drawable.bg_floating_pill)
-            btnD1.setTextColor(if (cur == 1500) Color.WHITE else Color.parseColor("#CBD5E1"))
-            btnD2.setBackgroundResource(if (cur == 2000) R.drawable.bg_floating_pill_on else R.drawable.bg_floating_pill)
-            btnD2.setTextColor(if (cur == 2000) Color.WHITE else Color.parseColor("#CBD5E1"))
-            btnD3.setBackgroundResource(if (cur == 3000) R.drawable.bg_floating_pill_on else R.drawable.bg_floating_pill)
-            btnD3.setTextColor(if (cur == 3000) Color.WHITE else Color.parseColor("#CBD5E1"))
+            delayButtons.forEach { (btn, ms) ->
+                val active = cur == ms
+                btn.setBackgroundResource(if (active) R.drawable.bg_floating_pill_on else R.drawable.bg_floating_pill)
+                btn.setTextColor(if (active) Color.WHITE else Color.parseColor("#CBD5E1"))
+            }
         }
         updateDelayUI()
-
-        btnD0.setOnClickListener { prefs.autoAnswerDelayMs = 0; updateDelayUI() }
-        btnD1.setOnClickListener { prefs.autoAnswerDelayMs = 1500; updateDelayUI() }
-        btnD2.setOnClickListener { prefs.autoAnswerDelayMs = 2000; updateDelayUI() }
-        btnD3.setOnClickListener { prefs.autoAnswerDelayMs = 3000; updateDelayUI() }
+        delayButtons.forEach { (btn, ms) ->
+            btn.setOnClickListener {
+                prefs.autoAnswerDelayMs = ms
+                updateDelayUI()
+            }
+        }
 
         var lastAnswerResultText = ""
 
         fun displaySolution(res: AbcdSolutionResult) {
             val text = if (res.ok) {
-                "🎯 Kunci: [${res.selectedOption}] ${res.optionText}\n" +
+                val keyLabel = res.selectedOption?.let { "[$it] " }.orEmpty()
+                "🎯 Kunci: $keyLabel${res.optionText}\n" +
                     "Sumber: ${res.source}\n" +
                     "Penjelasan: ${res.explanation}"
             } else {
@@ -1340,15 +1390,22 @@ class FloatingOverlayController(private val host: OverlayWindowHost) {
             tvAutoStatus.text = text
         }
 
-        AutoAnswerAccessibilityService.onAnswerResultListener = { sol ->
+        AutoScannerService.onAnswerResultListener = { sol ->
             mainHandler.post { displaySolution(sol) }
+        }
+        AutoScannerService.onStatusMessageListener = { statusMsg ->
+            mainHandler.post {
+                if (!tvAutoStatus.text.startsWith("🎯 Kunci:") || statusMsg.startsWith("Berhasil klik") || statusMsg.startsWith("Gagal klik") || statusMsg.startsWith("Mode Kunci")) {
+                    tvAutoStatus.text = statusMsg
+                }
+            }
         }
 
         btnTriggerScreenAnswer.setOnClickListener {
-            val service = AutoAnswerAccessibilityService.instance
+            val service = AutoScannerService.instance
             if (service != null) {
-                tvAutoStatus.text = "Sedang memindai soal di layar & menentukan jawaban..."
-                service.triggerAutoAnswer { success, msg ->
+                tvAutoStatus.text = "Memindai layar & menyusun teks soal..."
+                service.triggerAutoAnswer(fromAutoEvent = false) { success, msg ->
                     mainHandler.post {
                         if (!success && !tvAutoStatus.text.startsWith("🎯 Kunci:")) {
                             tvAutoStatus.text = msg
@@ -1356,17 +1413,17 @@ class FloatingOverlayController(private val host: OverlayWindowHost) {
                     }
                 }
             } else {
-                tvAutoStatus.text = "Layanan Aksesibilitas belum aktif. Aktifkan izin untuk auto-klik langsung di layar."
+                tvAutoStatus.text = "Layanan Aksesibilitas belum aktif. Ketuk Aktifkan Izin terlebih dahulu."
                 Toast.makeText(context, "Izin Aksesibilitas belum aktif", Toast.LENGTH_SHORT).show()
             }
         }
 
         btnCopyAutoAnswer.setOnClickListener {
             if (lastAnswerResultText.isNotEmpty()) {
-                cm.setPrimaryClip(ClipData.newPlainText("Kunci Jawaban Soal", lastAnswerResultText))
-                Toast.makeText(context, "Kunci jawaban berhasil disalin!", Toast.LENGTH_SHORT).show()
+                cm.setPrimaryClip(ClipData.newPlainText("Hasil & Penjelasan AI", lastAnswerResultText))
+                Toast.makeText(context, "Hasil & penjelasan berhasil disalin!", Toast.LENGTH_SHORT).show()
             } else {
-                Toast.makeText(context, "Belum ada kunci jawaban untuk disalin", Toast.LENGTH_SHORT).show()
+                Toast.makeText(context, "Belum ada hasil untuk disalin", Toast.LENGTH_SHORT).show()
             }
         }
 
@@ -1456,6 +1513,9 @@ class FloatingOverlayController(private val host: OverlayWindowHost) {
     }
 
     fun destroy() {
+        AutoScannerService.onStatusChangedListener = null
+        AutoScannerService.onAnswerResultListener = null
+        AutoScannerService.onStatusMessageListener = null
         bubbleView?.let { if (it.isAttachedToWindow) host.removeOverlayView(it) }
         dockView?.let { if (it.isAttachedToWindow) host.removeOverlayView(it) }
         selectionBoxView?.let { if (it.isAttachedToWindow) host.removeOverlayView(it) }

@@ -27,15 +27,20 @@
             android:textSize="13sp"
             android:textStyle="bold" />
 
-        <TextView
+        <androidx.appcompat.widget.AppCompatButton
+            android:id="@+id/btnAntiDetectToggle"
             android:layout_width="wrap_content"
-            android:layout_height="wrap_content"
-            android:background="@drawable/bg_floating_pill"
-            android:paddingHorizontal="8dp"
-            android:paddingVertical="3dp"
+            android:layout_height="26dp"
+            android:background="@drawable/bg_floating_pill_on"
+            android:minHeight="0dp"
+            android:minWidth="0dp"
+            android:paddingHorizontal="10dp"
+            android:stateListAnimator="@null"
             android:text="Anti Detek"
-            android:textColor="#94A3B8"
-            android:textSize="10sp" />
+            android:textAllCaps="false"
+            android:textColor="#FFFFFF"
+            android:textSize="10.5sp"
+            android:textStyle="bold" />
 
         <ImageButton
             android:id="@+id/btnFloatingClose"
@@ -701,7 +706,7 @@
                     android:textStyle="bold" />
             </LinearLayout>
 
-            <!-- Toggle Aktifkan Fitur Auto-Jawab -->
+            <!-- Baris 3: Toggle Otomatis Pindai Layar -->
             <LinearLayout
                 android:layout_width="match_parent"
                 android:layout_height="34dp"
@@ -713,7 +718,7 @@
                     android:layout_width="0dp"
                     android:layout_height="wrap_content"
                     android:layout_weight="1"
-                    android:text="Otomatis Jawab Soal Baru di Layar"
+                    android:text="Otomatis Pindai Layar"
                     android:textColor="#F8FAFC"
                     android:textSize="12sp"
                     android:textStyle="bold" />
@@ -724,7 +729,7 @@
                     android:layout_height="wrap_content" />
             </LinearLayout>
 
-            <!-- Pilihan Mode: Auto-Klik vs Kunci Saja -->
+            <!-- Baris 4: Dua tombol mode Auto-Klik Layar vs Kunci & Salin Saja -->
             <LinearLayout
                 android:layout_width="match_parent"
                 android:layout_height="32dp"
@@ -762,7 +767,7 @@
                     android:textSize="11sp" />
             </LinearLayout>
 
-            <!-- Pengaturan Jeda (Delay Anti Detek) -->
+            <!-- Baris 5: Pilihan Jeda Klik (0s, 1.5s, 2s, 3s, Acak 20s - 3m) -->
             <LinearLayout
                 android:layout_width="match_parent"
                 android:layout_height="wrap_content"
@@ -777,77 +782,97 @@
                     android:textColor="#CBD5E1"
                     android:textSize="11sp" />
 
-                <androidx.appcompat.widget.AppCompatButton
-                    android:id="@+id/btnDelay0"
-                    android:layout_width="wrap_content"
-                    android:layout_height="26dp"
-                    android:layout_marginStart="6dp"
-                    android:background="@drawable/bg_floating_pill"
-                    android:minHeight="0dp"
-                    android:minWidth="0dp"
-                    android:paddingHorizontal="6dp"
-                    android:stateListAnimator="@null"
-                    android:text="0s"
-                    android:textAllCaps="false"
-                    android:textColor="#CBD5E1"
-                    android:textSize="10sp" />
-
-                <androidx.appcompat.widget.AppCompatButton
-                    android:id="@+id/btnDelay1"
-                    android:layout_width="wrap_content"
-                    android:layout_height="26dp"
-                    android:layout_marginStart="4dp"
-                    android:background="@drawable/bg_floating_pill_on"
-                    android:minHeight="0dp"
-                    android:minWidth="0dp"
-                    android:paddingHorizontal="6dp"
-                    android:stateListAnimator="@null"
-                    android:text="1.5s"
-                    android:textAllCaps="false"
-                    android:textColor="#FFFFFF"
-                    android:textSize="10sp" />
-
-                <androidx.appcompat.widget.AppCompatButton
-                    android:id="@+id/btnDelay2"
-                    android:layout_width="wrap_content"
-                    android:layout_height="26dp"
-                    android:layout_marginStart="4dp"
-                    android:background="@drawable/bg_floating_pill"
-                    android:minHeight="0dp"
-                    android:minWidth="0dp"
-                    android:paddingHorizontal="6dp"
-                    android:stateListAnimator="@null"
-                    android:text="2s"
-                    android:textAllCaps="false"
-                    android:textColor="#CBD5E1"
-                    android:textSize="10sp" />
-
-                <androidx.appcompat.widget.AppCompatButton
-                    android:id="@+id/btnDelay3"
-                    android:layout_width="wrap_content"
-                    android:layout_height="26dp"
-                    android:layout_marginStart="4dp"
-                    android:background="@drawable/bg_floating_pill"
-                    android:minHeight="0dp"
-                    android:minWidth="0dp"
-                    android:paddingHorizontal="6dp"
-                    android:stateListAnimator="@null"
-                    android:text="3s"
-                    android:textAllCaps="false"
-                    android:textColor="#CBD5E1"
-                    android:textSize="10sp" />
-
-                <TextView
+                <HorizontalScrollView
                     android:layout_width="0dp"
                     android:layout_height="wrap_content"
+                    android:layout_marginStart="6dp"
                     android:layout_weight="1"
-                    android:gravity="end"
-                    android:text="(Anti-Detek)"
-                    android:textColor="#94A3B8"
-                    android:textSize="10sp" />
+                    android:scrollbars="none">
+
+                    <LinearLayout
+                        android:layout_width="wrap_content"
+                        android:layout_height="wrap_content"
+                        android:gravity="center_vertical"
+                        android:orientation="horizontal">
+
+                        <androidx.appcompat.widget.AppCompatButton
+                            android:id="@+id/btnDelay0"
+                            android:layout_width="wrap_content"
+                            android:layout_height="26dp"
+                            android:background="@drawable/bg_floating_pill"
+                            android:minHeight="0dp"
+                            android:minWidth="0dp"
+                            android:paddingHorizontal="7dp"
+                            android:stateListAnimator="@null"
+                            android:text="0s"
+                            android:textAllCaps="false"
+                            android:textColor="#CBD5E1"
+                            android:textSize="10sp" />
+
+                        <androidx.appcompat.widget.AppCompatButton
+                            android:id="@+id/btnDelay1"
+                            android:layout_width="wrap_content"
+                            android:layout_height="26dp"
+                            android:layout_marginStart="4dp"
+                            android:background="@drawable/bg_floating_pill_on"
+                            android:minHeight="0dp"
+                            android:minWidth="0dp"
+                            android:paddingHorizontal="7dp"
+                            android:stateListAnimator="@null"
+                            android:text="1.5s"
+                            android:textAllCaps="false"
+                            android:textColor="#FFFFFF"
+                            android:textSize="10sp" />
+
+                        <androidx.appcompat.widget.AppCompatButton
+                            android:id="@+id/btnDelay2"
+                            android:layout_width="wrap_content"
+                            android:layout_height="26dp"
+                            android:layout_marginStart="4dp"
+                            android:background="@drawable/bg_floating_pill"
+                            android:minHeight="0dp"
+                            android:minWidth="0dp"
+                            android:paddingHorizontal="7dp"
+                            android:stateListAnimator="@null"
+                            android:text="2s"
+                            android:textAllCaps="false"
+                            android:textColor="#CBD5E1"
+                            android:textSize="10sp" />
+
+                        <androidx.appcompat.widget.AppCompatButton
+                            android:id="@+id/btnDelay3"
+                            android:layout_width="wrap_content"
+                            android:layout_height="26dp"
+                            android:layout_marginStart="4dp"
+                            android:background="@drawable/bg_floating_pill"
+                            android:minHeight="0dp"
+                            android:minWidth="0dp"
+                            android:paddingHorizontal="7dp"
+                            android:stateListAnimator="@null"
+                            android:text="3s"
+                            android:textAllCaps="false"
+                            android:textColor="#CBD5E1"
+                            android:textSize="10sp" />
+
+                        <androidx.appcompat.widget.AppCompatButton
+                            android:id="@+id/btnDelayRandom"
+                            android:layout_width="wrap_content"
+                            android:layout_height="26dp"
+                            android:layout_marginStart="4dp"
+                            android:background="@drawable/bg_floating_pill"
+                            android:minHeight="0dp"
+                            android:minWidth="0dp"
+                            android:paddingHorizontal="8dp"
+                            android:stateListAnimator="@null"
+                            android:text="Acak (20s - 3m)"
+                            android:textAllCaps="false"
+                            android:textColor="#CBD5E1"
+                            android:textSize="10sp" />
+                    </LinearLayout>
+                </HorizontalScrollView>
             </LinearLayout>
 
-            <!-- Tombol Aksi Langsung -->
+            <!-- Baris 6: Tombol Aksi Langsung -->
             <androidx.appcompat.widget.AppCompatButton
                 android:id="@+id/btnTriggerScreenAnswer"
                 android:layout_width="match_parent"
@@ -857,13 +882,13 @@
                 android:minHeight="0dp"
                 android:minWidth="0dp"
                 android:stateListAnimator="@null"
-                android:text="⚡ Pindai &amp; Jawab Soal di Layar Sekarang"
+                android:text="⚡ Pindai &amp; Proses Layar Sekarang"
                 android:textAllCaps="false"
                 android:textColor="#FFFFFF"
                 android:textSize="12sp"
                 android:textStyle="bold" />
 
-            <!-- Log / Hasil Jawaban Terakhir -->
+            <!-- Baris 7: TextView Status -->
             <ScrollView
                 android:layout_width="match_parent"
                 android:layout_height="90dp"
@@ -875,11 +900,12 @@
                     android:id="@+id/tvAutoAnswerStatus"
                     android:layout_width="match_parent"
                     android:layout_height="wrap_content"
-                    android:text="Status: Siap mendeteksi soal ABCD di aplikasi kuis/ujian."
+                    android:text="Status: Siap mendeteksi soal ABCD di layar."
                     android:textColor="#E2E8F0"
                     android:textSize="11.5sp" />
             </ScrollView>
 
+            <!-- Baris 8: Tombol Salin Hasil & Penjelasan -->
             <androidx.appcompat.widget.AppCompatButton
                 android:id="@+id/btnCopyAutoAnswer"
                 android:layout_width="match_parent"
@@ -889,9 +915,9 @@
                 android:minHeight="0dp"
                 android:minWidth="0dp"
                 android:stateListAnimator="@null"
-                android:text="📋 Salin Kunci &amp; Penjelasan"
+                android:text="📋 Salin Hasil &amp; Penjelasan"
                 android:textAllCaps="false"
-                    android:textColor="#38BDF8"
+                android:textColor="#38BDF8"
                 android:textSize="11.5sp"
                 android:textStyle="bold" />
         </LinearLayout>

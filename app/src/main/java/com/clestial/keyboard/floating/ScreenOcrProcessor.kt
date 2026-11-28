@@ -9,7 +9,7 @@ import android.os.Looper
 import android.widget.Toast
 import com.clestial.keyboard.Prefs
 import com.clestial.keyboard.autoanswer.AbcdSolver
-import com.clestial.keyboard.autoanswer.AutoAnswerAccessibilityService
+import com.clestial.keyboard.autoanswer.AutoScannerService
 import com.clestial.keyboard.math.OfflineMathAssistant
 import com.google.mlkit.vision.common.InputImage
 import com.google.mlkit.vision.text.TextRecognition
@@ -50,7 +50,7 @@ object ScreenOcrProcessor {
 
                         cm.setPrimaryClip(ClipData.newPlainText("Kunci Jawaban", summary))
 
-                        val service = AutoAnswerAccessibilityService.instance
+                        val service = AutoScannerService.instance
                         if (solution.ok && service != null && prefs.autoAnswerMode == Prefs.MODE_AUTO_CLICK) {
                             service.triggerAutoAnswer { _, _ -> }
                         }

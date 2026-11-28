@@ -107,11 +107,9 @@ object AbcdSolver {
         prefs: Prefs,
         onDone: (AbcdSolutionResult) -> Unit
     ) {
-        val apiKey = prefs.chatGptApiKey.trim()
-        val proxyUrl = prefs.aiProxyUrl.trim()
         val preferAi = prefs.autoAnswerEngine == Prefs.ENGINE_AI
 
-        if (preferAi && (apiKey.isNotEmpty() || (proxyUrl.isNotEmpty() && !proxyUrl.contains("10.0.2.2")))) {
+        if (preferAi && AiRouterClient.hasConfiguredEndpoint(prefs)) {
             solveWithAi(question, prefs) { aiRes ->
                 if (aiRes.ok && aiRes.selectedOption != null) {
                     onDone(aiRes)

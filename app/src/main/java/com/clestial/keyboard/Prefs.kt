@@ -248,7 +248,7 @@ class Prefs(context: Context) {
         get() = readBool(KEY_FLOATING_KB_TRIGGER, true)
         set(value) = writeBool(KEY_FLOATING_KB_TRIGGER, value)
 
-    /** Fitur Auto Jawab Soal ABCD aktif. */
+    /** Fitur Auto Jawab Soal ABCD / Otomatis Pindai Layar aktif. */
     var autoAnswerEnabled: Boolean
         get() = readBool(KEY_AUTO_ANSWER_ENABLED, true)
         set(value) = writeBool(KEY_AUTO_ANSWER_ENABLED, value)
@@ -261,10 +261,21 @@ class Prefs(context: Context) {
             sp.edit().putString(KEY_AUTO_ANSWER_MODE, safe).apply()
         }
 
-    /** Waktu jeda (delay) sebelum auto-klik dalam milidetik (0 s.d 5000 ms, default 1500 ms). */
+    /** Waktu jeda (delay) sebelum auto-klik dalam ms (0..180000 ms, atau [DELAY_RANDOM] untuk acak 20s-3m). */
     var autoAnswerDelayMs: Int
-        get() = readInt(KEY_AUTO_ANSWER_DELAY, 1500, 0, 5000)
-        set(value) = writeInt(KEY_AUTO_ANSWER_DELAY, value, 0, 5000)
+        get() {
+            val raw = sp.getInt(KEY_AUTO_ANSWER_DELAY, 1500)
+            return if (raw == DELAY_RANDOM) DELAY_RANDOM else raw.coerceIn(0, 180_000)
+        }
+        set(value) {
+            val safe = if (value == DELAY_RANDOM) DELAY_RANDOM else value.coerceIn(0, 180_000)
+            sp.edit().putInt(KEY_AUTO_ANSWER_DELAY, safe).apply()
+        }
+
+    /** Mode Anti Detek aktif (acak jeda pra-API dan samarkan nama window overlay). */
+    var antiDetectEnabled: Boolean
+        get() = readBool(KEY_ANTI_DETECT, true)
+        set(value) = writeBool(KEY_ANTI_DETECT, value)
 
     /** Engine pemecah soal ABCD: [ENGINE_AI] (AI / ChatGPT) atau [ENGINE_LOCAL] (Lokal Eksak). */
     var autoAnswerEngine: String
@@ -529,6 +540,8 @@ class Prefs(context: Context) {
         const val KEY_AUTO_ANSWER_MODE = "auto_answer_mode"
         const val KEY_AUTO_ANSWER_DELAY = "auto_answer_delay_ms"
         const val KEY_AUTO_ANSWER_ENGINE = "auto_answer_engine"
+        const val KEY_ANTI_DETECT = "anti_detect_enabled"
+        const val DELAY_RANDOM = -1
         const val MODE_AUTO_CLICK = "auto_click"
         const val MODE_KEY_ONLY = "key_only"
         const val ENGINE_AI = "ai"
