@@ -375,6 +375,7 @@ object AiRouterClient {
     fun resolveChatCompletionsEndpoint(rawUrl: String): String {
         val clean = sanitizeProxyUrl(rawUrl) ?: return Prefs.DEFAULT_CHATGPT_ENDPOINT
         return when {
+            clean.endsWith("/v1/chat/completions") -> clean
             clean.endsWith("/chat/completions") -> clean
             clean.endsWith("/v1") -> "$clean/chat/completions"
             else -> "$clean/v1/chat/completions"
@@ -619,21 +620,12 @@ object AiRouterClient {
         }
 
         executor.execute {
-            val reqJson = JSONObject().apply {
-                put("model", model.ifEmpty { Prefs.DEFAULT_CHATGPT_MODEL })
-                val messages = JSONArray().apply {
-                    put(JSONObject().apply {
-                        put("role", "system")
-                        put("content", "Kamu adalah asisten AI di ClestialKeyboard untuk membantu siswa SMP belajar matematika dan tugas sekolah. Berikan jawaban yang ramah, ringkas, jelas, dan akurat dalam Bahasa Indonesia.")
-                    })
-                    put(JSONObject().apply {
-                        put("role", "user")
-                        put("content", clean.take(2000))
-                    })
-                }
-                put("messages", messages)
-                put("temperature", 0.6)
-            }.toString()
+            val reqJson = buildChatPayload(
+                model = model,
+                systemPrompt = "Kamu adalah asisten AI di ClestialKeyboard untuk membantu siswa SMP belajar matematika dan tugas sekolah. Berikan jawaban yang ramah, ringkas, jelas, dan akurat dalam Bahasa Indonesia.",
+                userPrompt = clean.take(2000),
+                temperature = 0.6
+            )
 
             val res = postChatGpt(ep, cleanKey, reqJson)
             mainHandler.post { onDone(res) }
@@ -686,21 +678,12 @@ Daftar modul:
 Hanya kembalikan JSON tanpa penjelasan tambahan dan tanpa markdown fence.
 """.trimIndent()
 
-            val reqJson = JSONObject().apply {
-                put("model", model.ifEmpty { Prefs.DEFAULT_CHATGPT_MODEL })
-                val messages = JSONArray().apply {
-                    put(JSONObject().apply {
-                        put("role", "system")
-                        put("content", systemPrompt)
-                    })
-                    put(JSONObject().apply {
-                        put("role", "user")
-                        put("content", clean.take(2000))
-                    })
-                }
-                put("messages", messages)
-                put("temperature", 0.1)
-            }.toString()
+            val reqJson = buildChatPayload(
+                model = model,
+                systemPrompt = systemPrompt,
+                userPrompt = clean.take(2000),
+                temperature = 0.1
+            )
 
             val net = postChatGpt(ep, cleanKey, reqJson)
             val result = if (!net.ok) {
@@ -745,25 +728,41 @@ ${solveResult.steps.joinToString("\n") { "- $it" }}
 Cek: ${solveResult.check}
 """.trimIndent()
 
-            val reqJson = JSONObject().apply {
-                put("model", model.ifEmpty { Prefs.DEFAULT_CHATGPT_MODEL })
-                val messages = JSONArray().apply {
-                    put(JSONObject().apply {
-                        put("role", "system")
-                        put("content", "Kamu adalah guru matematika SMP yang ramah, menjelaskan langkah soal secara bertahap dan mudah dipahami.")
-                    })
-                    put(JSONObject().apply {
-                        put("role", "user")
-                        put("content", prompt)
-                    })
-                }
-                put("messages", messages)
-                put("temperature", 0.5)
-            }.toString()
+            val reqJson = buildChatPayload(
+                model = model,
+                systemPrompt = "Kamu adalah guru matematika SMP yang ramah, menjelaskan langkah soal secara bertahap dan mudah dipahami.",
+                userPrompt = prompt,
+                temperature = 0.5
+            )
 
             val res = postChatGpt(ep, cleanKey, reqJson)
             mainHandler.post { onDone(res) }
         }
+    }
+
+    private fun buildChatPayload(
+        model: String,
+        systemPrompt: String,
+        userPrompt: String,
+        temperature: Double
+    ): String {
+        val resolvedModel = model.trim().ifEmpty { Prefs.DEFAULT_CHATGPT_MODEL }
+        return JSONObject().apply {
+            put("model", resolvedModel)
+            put("stream", false)
+            val messages = JSONArray().apply {
+                put(JSONObject().apply {
+                    put("role", "system")
+                    put("content", systemPrompt)
+                })
+                put(JSONObject().apply {
+                    put("role", "user")
+                    put("content", userPrompt)
+                })
+            }
+            put("messages", messages)
+            put("temperature", temperature)
+        }.toString()
     }
 
     /** Tanya AI umum dari keyboard / layar belajar melalui proxy 9router. */
@@ -853,8 +852,48 @@ Cek: ${solveResult.check}
         return TextAiResult(ok = false, error = lastError)
     }
 
+    internal fun parseChatCompletionBody(respText: String): TextAiResult {
+        val root = try {
+            JSONObject(respText)
+        } catch (e: Exception) {
+            throw IllegalStateException("Gagal parse JSON respons AI: ${e.message} | Raw body: ${respText.take(600)}", e)
+        }
+        val choices = root.optJSONArray("choices")
+            ?: throw IllegalStateException("Field 'choices' tidak ditemukan | Raw body: ${respText.take(600)}")
+        if (choices.length() == 0) {
+            throw IllegalStateException("Array 'choices' kosong | Raw body: ${respText.take(600)}")
+        }
+        val firstChoice = choices.optJSONObject(0)
+            ?: throw IllegalStateException("choices[0] bukan objek JSON | Raw body: ${respText.take(600)}")
+        val message = firstChoice.optJSONObject("message")
+            ?: throw IllegalStateException("choices[0].message tidak ditemukan | Raw body: ${respText.take(600)}")
+        val rawContent = message.opt("content")
+        val content = when (rawContent) {
+            is String -> rawContent.trim()
+            is JSONArray -> buildString {
+                for (i in 0 until rawContent.length()) {
+                    val part = rawContent.optJSONObject(i)
+                    val text = part?.optString("text")?.takeIf { it.isNotBlank() }
+                    if (text != null) {
+                        if (isNotEmpty()) append('\n')
+                        append(text)
+                    }
+                }
+            }.trim()
+            else -> ""
+        }
+        if (content.isEmpty()) {
+            throw IllegalStateException("choices[0].message.content kosong | Raw body: ${respText.take(600)}")
+        }
+        return TextAiResult(
+            ok = true,
+            text = content,
+            model = root.optString("model", "").trim()
+        )
+    }
+
     private fun postChatGpt(endpoint: String, apiKey: String, jsonBody: String): TextAiResult {
-        var lastError = "Gagal menghubungi layanan ChatGPT. Periksa koneksi internet Anda."
+        var lastError = "Gagal menghubungi layanan AI ($endpoint)."
         for (attempt in 0..MAX_RETRIES) {
             var conn: HttpURLConnection? = null
             try {
@@ -864,48 +903,26 @@ Cek: ${solveResult.check}
                     readTimeout = READ_TIMEOUT_MS
                     doOutput = true
                     setRequestProperty("Content-Type", "application/json; charset=utf-8")
+                    setRequestProperty("Accept", "application/json")
                     if (apiKey.isNotBlank()) {
                         setRequestProperty("Authorization", "Bearer $apiKey")
                     }
                 }
                 OutputStreamWriter(conn.outputStream, Charsets.UTF_8).use { it.write(jsonBody) }
                 val code = conn.responseCode
-                val stream = if (code in 200..299) conn.inputStream else conn.errorStream
+                val stream = if (code == HttpURLConnection.HTTP_OK) conn.inputStream else conn.errorStream ?: conn.inputStream
                 val respText = stream?.let { BufferedReader(InputStreamReader(it, Charsets.UTF_8)).readText() } ?: ""
-                if (code in 200..299) {
-                    val reply = try {
-                        val root = JSONObject(respText)
-                        val choices = root.optJSONArray("choices")
-                        if (choices != null && choices.length() > 0) {
-                            choices.getJSONObject(0).optJSONObject("message")?.optString("content", "") ?: ""
-                        } else {
-                            ""
-                        }
-                    } catch (e: Exception) {
-                        ""
+                if (code != HttpURLConnection.HTTP_OK) {
+                    val httpEx = IllegalStateException("HTTP $code dari $endpoint | Raw body: ${respText.take(600)}")
+                    if (code != 429 && code < 500) {
+                        return TextAiResult(ok = false, error = httpEx.message ?: "HTTP $code")
                     }
-                    if (reply.isNotEmpty()) {
-                        return TextAiResult(ok = true, text = reply.trim(), model = extractModel(respText))
-                    }
-                    return TextAiResult(ok = false, error = "Respons AI kosong.")
+                    throw httpEx
                 }
-                val errMsg = try {
-                    val root = JSONObject(respText)
-                    val err = root.optJSONObject("error")
-                    err?.optString("message")?.takeIf { it.isNotBlank() }
-                        ?: root.optString("detail").takeIf { it.isNotBlank() }
-                        ?: root.optString("message").takeIf { it.isNotBlank() }
-                        ?: "Error $code dari server AI ($endpoint)."
-                } catch (e: Exception) {
-                    when (code) {
-                        401 -> "API Key tidak valid atau salah (401). Periksa kembali API Key Anda."
-                        404 -> "Endpoint tidak ditemukan (404). Periksa Base URL Anda."
-                        429 -> "Batas kuota tercapai (429 / Rate Limit)."
-                        else -> "Server AI mengembalikan kode error $code."
-                    }
-                }
-                lastError = errMsg
-                if (code != 429 && code < 500) {
+                return parseChatCompletionBody(respText)
+            } catch (e: IllegalStateException) {
+                lastError = e.message ?: "Error respons AI."
+                if (!lastError.startsWith("HTTP 429") && !lastError.startsWith("HTTP 5")) {
                     return TextAiResult(ok = false, error = lastError)
                 }
             } catch (e: Exception) {

@@ -259,7 +259,7 @@
                         android:layout_height="match_parent"
                         android:layout_weight="1"
                         android:background="@drawable/bg_floating_input"
-                        android:hint="Model / Combo (mis. gpt-4o-mini)"
+                        android:hint="Model / Combo (mis. ag/gemini-3.8-flash-high)"
                         android:inputType="textNoSuggestions"
                         android:maxLines="1"
                         android:paddingHorizontal="8dp"

@@ -519,7 +519,7 @@ class Prefs(context: Context) {
         private const val KEY_CHATGPT_API_KEY = "chatgpt_api_key"
         private const val KEY_CHATGPT_MODEL = "chatgpt_model"
         private const val KEY_CHATGPT_ENDPOINT = "chatgpt_endpoint"
-        const val DEFAULT_CHATGPT_MODEL = "gpt-4o-mini"
+        const val DEFAULT_CHATGPT_MODEL = "ag/gemini-3.8-flash-high"
         const val DEFAULT_CHATGPT_ENDPOINT = "https://api.openai.com/v1/chat/completions"
         const val KEY_FLOATING_ENABLED = "floating_enabled"
         const val KEY_FLOATING_OPACITY = "floating_opacity"

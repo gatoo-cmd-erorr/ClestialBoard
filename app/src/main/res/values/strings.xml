@@ -290,7 +290,7 @@
     <string name="ai_cfg_test_desc">Cek status endpoint /v1/models menggunakan Base URL dan API Key aktif</string>
     <string name="ai_cfg_base_url_hint">https://...trycloudflare.com/v1 atau http://ip:20128/v1</string>
     <string name="ai_cfg_api_key_hint">sk-... / gsk_... / sk-or-...</string>
-    <string name="ai_cfg_model_hint">gpt-4o-mini atau nama combo 9router</string>
+    <string name="ai_cfg_model_hint">ag/gemini-3.8-flash-high atau nama combo 9router</string>
     <string name="ai_cfg_save">Simpan</string>
     <string name="ai_cfg_test">Tes Koneksi</string>
     <string name="ai_cfg_reset">Reset Default</string>

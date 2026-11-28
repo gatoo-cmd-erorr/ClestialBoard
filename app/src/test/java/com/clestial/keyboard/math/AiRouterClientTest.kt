@@ -1,5 +1,6 @@
 package com.clestial.keyboard.math
 
+import com.clestial.keyboard.Prefs
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
 import org.junit.Assert.assertNull
@@ -9,7 +10,16 @@ import org.junit.Test
 class AiRouterClientTest {
 
     @Test
+    fun defaultModel_isGemini38FlashHigh() {
+        assertEquals("ag/gemini-3.8-flash-high", Prefs.DEFAULT_CHATGPT_MODEL)
+    }
+
+    @Test
     fun resolveChatCompletionsEndpoint_handlesDynamicBaseUrls() {
+        assertEquals(
+            "https://passive-candidate-knife-computers.trycloudflare.com/v1/chat/completions",
+            AiRouterClient.resolveChatCompletionsEndpoint("https://passive-candidate-knife-computers.trycloudflare.com")
+        )
         assertEquals(
             "https://demo-tunnel.trycloudflare.com/v1/chat/completions",
             AiRouterClient.resolveChatCompletionsEndpoint("https://demo-tunnel.trycloudflare.com")
