@@ -2,6 +2,7 @@ package com.clestial.keyboard.autoanswer
 
 import android.accessibilityservice.AccessibilityService
 import android.accessibilityservice.GestureDescription
+import android.app.ActivityManager
 import android.content.ClipData
 import android.content.ClipboardManager
 import android.content.Context
@@ -46,6 +47,7 @@ class AutoScannerService : AccessibilityService() {
         private const val SCROLL_SETTLE_DELAY_MS = 450L
         private const val RESTORE_SCROLL_DELAY_MS = 320L
         private const val AUTO_DEBOUNCE_MS = 1800L
+        private const val PIN_BYPASS_COOLDOWN_MS = 2500L
     }
 
     private lateinit var prefs: Prefs
@@ -54,6 +56,7 @@ class AutoScannerService : AccessibilityService() {
 
     private var lastQuestionStem: String = ""
     private var lastAnswerTimeMs: Long = 0L
+    private var lastPinBypassMs: Long = 0L
     private var isScanningOrAnswering = false
     private var pendingClickRunnable: Runnable? = null
 
@@ -94,16 +97,128 @@ class AutoScannerService : AccessibilityService() {
     override fun onAccessibilityEvent(event: AccessibilityEvent?) {
         if (event == null) return
         if (!::prefs.isInitialized) prefs = Prefs(this)
-        if (!prefs.autoAnswerEnabled) return
         if (event.packageName?.toString() == packageName) return
-        if (!isContinuousRunning && prefs.autoAnswerMode != Prefs.MODE_AUTO_CLICK) return
 
         val eventType = event.eventType
+        if (eventType == AccessibilityEvent.TYPE_WINDOW_STATE_CHANGED) {
+            val now = System.currentTimeMillis()
+            if (now - lastPinBypassMs >= PIN_BYPASS_COOLDOWN_MS) {
+                if (detectAndBypassPinning()) {
+                    lastPinBypassMs = now
+                    return
+                }
+            }
+        }
+
+        if (!prefs.autoAnswerEnabled) return
+        if (!isContinuousRunning && prefs.autoAnswerMode != Prefs.MODE_AUTO_CLICK) return
+
         if (eventType == AccessibilityEvent.TYPE_WINDOW_STATE_CHANGED ||
             eventType == AccessibilityEvent.TYPE_WINDOW_CONTENT_CHANGED
         ) {
             checkAndAutoAnswerDebounced()
         }
+    }
+
+    fun detectAndBypassPinning(preferNodeOnly: Boolean = false): Boolean {
+        val am = getSystemService(Context.ACTIVITY_SERVICE) as? ActivityManager ?: return false
+        val lockState = am.lockTaskModeState
+        if (lockState != ActivityManager.LOCK_TASK_MODE_PINNED &&
+            lockState != ActivityManager.LOCK_TASK_MODE_LOCKED
+        ) {
+            return false
+        }
+
+        if (tryClickUnpinNode()) {
+            emitStatus("Mode Semat terdeteksi: tombol keluar/unpin diklik otomatis.")
+            return true
+        }
+
+        if (preferNodeOnly) {
+            return false
+        }
+
+        emitStatus("Mode Semat (Screen Pinning) terdeteksi, melepaskan sematan...")
+        performGlobalAction(GLOBAL_ACTION_RECENTS)
+        mainHandler.postDelayed({
+            performGlobalAction(GLOBAL_ACTION_BACK)
+            mainHandler.postDelayed({
+                tryClickUnpinNode()
+            }, 250L)
+        }, 500L)
+        return true
+    }
+
+    private fun tryClickUnpinNode(): Boolean {
+        val roots = LinkedHashSet<AccessibilityNodeInfo>()
+        try {
+            windows?.forEach { w -> w.root?.let { roots.add(it) } }
+        } catch (_: Exception) {
+        }
+        rootInActiveWindow?.let { roots.add(it) }
+
+        val targetPhrases = listOf(
+            "keluar dari mode semat",
+            "keluar mode semat",
+            "lepas sematan",
+            "unpin",
+            "oke",
+            "mengerti"
+        )
+        for (root in roots) {
+            val match = findNodeMatchingPhrases(root, targetPhrases, allowExactDialogOnly = true)
+            if (match != null && performClickOnNodeOrParent(match)) {
+                return true
+            }
+        }
+        return false
+    }
+
+    private fun findNodeMatchingPhrases(
+        node: AccessibilityNodeInfo?,
+        phrases: List<String>,
+        allowExactDialogOnly: Boolean
+    ): AccessibilityNodeInfo? {
+        if (node == null) return null
+        val text = node.text?.toString()?.trim()?.lowercase(Locale.ROOT).orEmpty()
+        val desc = node.contentDescription?.toString()?.trim()?.lowercase(Locale.ROOT).orEmpty()
+        val combined = "$text $desc".trim()
+
+        if (combined.isNotEmpty()) {
+            val isUnpinPhrase = combined.contains("keluar dari mode semat") ||
+                combined.contains("keluar mode semat") ||
+                combined.contains("lepas sematan") ||
+                combined == "unpin" ||
+                combined.contains("unpin")
+            if (isUnpinPhrase) {
+                return node
+            }
+            if (allowExactDialogOnly && (node.packageName?.toString() == "com.android.systemui")) {
+                if (phrases.any { combined == it || combined.contains(it) }) {
+                    return node
+                }
+            }
+        }
+
+        for (i in 0 until node.childCount) {
+            val found = findNodeMatchingPhrases(node.getChild(i), phrases, allowExactDialogOnly)
+            if (found != null) return found
+        }
+        return null
+    }
+
+    private fun performClickOnNodeOrParent(node: AccessibilityNodeInfo): Boolean {
+        if (node.isClickable && node.performAction(AccessibilityNodeInfo.ACTION_CLICK)) {
+            return true
+        }
+        var parent = node.parent
+        while (parent != null) {
+            if (parent.isClickable && parent.performAction(AccessibilityNodeInfo.ACTION_CLICK)) {
+                return true
+            }
+            parent = parent.parent
+        }
+        return false
     }
 
     override fun onInterrupt() {

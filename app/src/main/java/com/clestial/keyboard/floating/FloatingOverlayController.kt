@@ -1,5 +1,6 @@
 package com.clestial.keyboard.floating
 
+import android.accessibilityservice.AccessibilityService
 import android.annotation.SuppressLint
 import android.app.Activity
 import android.content.ClipData
@@ -7,6 +8,7 @@ import android.content.ClipboardManager
 import android.content.Context
 import android.content.Intent
 import android.graphics.Color
+import android.graphics.PixelFormat
 import android.os.Build
 import android.os.Handler
 import android.os.Looper
@@ -227,12 +229,22 @@ class FloatingOverlayController(private val host: OverlayWindowHost) {
         AutoScannerService.instance?.setImmersiveMode(hideNav)
     }
 
-    private fun safeAddView(view: View, params: WindowManager.LayoutParams) {
-        applyWindowDisguise(params)
-        @Suppress("DEPRECATION")
+    @Suppress("DEPRECATION")
+    private fun ensureOverlayWindowParams(params: WindowManager.LayoutParams) {
+        if (context is AccessibilityService) {
+            params.type = WindowManager.LayoutParams.TYPE_ACCESSIBILITY_OVERLAY
+        }
         params.flags = params.flags or
             WindowManager.LayoutParams.FLAG_FULLSCREEN or
-            WindowManager.LayoutParams.FLAG_LAYOUT_NO_LIMITS
+            WindowManager.LayoutParams.FLAG_LAYOUT_NO_LIMITS or
+            WindowManager.LayoutParams.FLAG_LAYOUT_IN_SCREEN or
+            WindowManager.LayoutParams.FLAG_SHOW_WHEN_LOCKED
+        params.format = PixelFormat.TRANSLUCENT
+    }
+
+    private fun safeAddView(view: View, params: WindowManager.LayoutParams) {
+        applyWindowDisguise(params)
+        ensureOverlayWindowParams(params)
         applyNavigationBarMode(view, prefs.hideNavigationEnabled)
         if (!view.isAttachedToWindow) {
             try {
@@ -270,7 +282,9 @@ class FloatingOverlayController(private val host: OverlayWindowHost) {
             gravity = Gravity.TOP or Gravity.START,
             x = 16,
             y = context.resources.displayMetrics.heightPixels / 3
-        )
+        ).apply {
+            ensureOverlayWindowParams(this)
+        }
 
         val touchSlop = ViewConfiguration.get(context).scaledTouchSlop
         var initialX = 0
@@ -338,7 +352,9 @@ class FloatingOverlayController(private val host: OverlayWindowHost) {
             gravity = Gravity.TOP or Gravity.START,
             x = 0,
             y = context.resources.displayMetrics.heightPixels / 3 - dp(40f)
-        )
+        ).apply {
+            ensureOverlayWindowParams(this)
+        }
 
         val dragHandle = dockRoot.findViewById<View>(R.id.dockDragHandle)
         var initialY = 0
@@ -417,6 +433,7 @@ class FloatingOverlayController(private val host: OverlayWindowHost) {
         safeAddView(v, p)
         v.visibility = View.VISIBLE
         applyNavigationBarMode(v, prefs.hideNavigationEnabled)
+        AutoScannerService.instance?.detectAndBypassPinning()
         isDockShowing = true
         hideBubble()
     }
@@ -442,7 +459,9 @@ class FloatingOverlayController(private val host: OverlayWindowHost) {
             gravity = Gravity.TOP or Gravity.START,
             x = (displayW - defaultW) / 2,
             y = dp(180f)
-        )
+        ).apply {
+            ensureOverlayWindowParams(this)
+        }
 
         val boxFrame = boxRoot.findViewById<FrameLayout>(R.id.boxFrame)
         val ivResizeHandle = boxRoot.findViewById<ImageView>(R.id.ivResizeHandle)
@@ -580,6 +599,7 @@ class FloatingOverlayController(private val host: OverlayWindowHost) {
             x = 0,
             y = dp(8f)
         ).apply {
+            ensureOverlayWindowParams(this)
             flags = flags or WindowManager.LayoutParams.FLAG_WATCH_OUTSIDE_TOUCH
             softInputMode = WindowManager.LayoutParams.SOFT_INPUT_ADJUST_PAN
         }
@@ -1549,6 +1569,7 @@ class FloatingOverlayController(private val host: OverlayWindowHost) {
         safeAddView(v, p)
         v.visibility = View.VISIBLE
         applyNavigationBarMode(v, prefs.hideNavigationEnabled)
+        AutoScannerService.instance?.detectAndBypassPinning()
         isPopupShowing = true
         hideBubble()
         hideDock()
