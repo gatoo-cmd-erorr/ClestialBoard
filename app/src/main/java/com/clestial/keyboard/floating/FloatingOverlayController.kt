@@ -506,40 +506,47 @@ class FloatingOverlayController(private val host: OverlayWindowHost) {
             height = WindowManager.LayoutParams.WRAP_CONTENT,
             gravity = Gravity.TOP or Gravity.CENTER_HORIZONTAL,
             x = 0,
-            y = dp(12f)
-        )
+            y = dp(8f)
+        ).apply {
+            flags = flags or WindowManager.LayoutParams.FLAG_WATCH_OUTSIDE_TOUCH
+            softInputMode = WindowManager.LayoutParams.SOFT_INPUT_ADJUST_PAN
+        }
 
         val imm = context.getSystemService(Context.INPUT_METHOD_SERVICE) as InputMethodManager
+        popup.setOnTouchListener { v, event ->
+            if (event.action == MotionEvent.ACTION_OUTSIDE) {
+                imm.hideSoftInputFromWindow(v.windowToken, 0)
+                setPopupFocusable(false)
+            }
+            false
+        }
+
         fun enableOverlayTyping(et: EditText, trackAsMathField: Boolean = false) {
             et.isFocusable = true
             et.isFocusableInTouchMode = true
             et.isEnabled = true
             et.setTextColor(Color.parseColor("#F8FAFC"))
             et.setHintTextColor(Color.parseColor("#94A3B8"))
+            fun activateFieldInput(v: View) {
+                if (trackAsMathField) activeMathEditText = et
+                setPopupFocusable(true)
+                v.requestFocus()
+                mainHandler.postDelayed({
+                    v.requestFocus()
+                    imm.showSoftInput(v, InputMethodManager.SHOW_IMPLICIT)
+                }, 90)
+            }
             et.setOnFocusChangeListener { v, hasFocus ->
-                if (hasFocus) {
-                    if (trackAsMathField) activeMathEditText = et
-                    mainHandler.post {
-                        imm.showSoftInput(v, InputMethodManager.SHOW_IMPLICIT)
-                    }
-                }
+                if (hasFocus) activateFieldInput(v)
             }
             et.setOnTouchListener { v, event ->
-                if (event.action == MotionEvent.ACTION_UP) {
-                    if (trackAsMathField) activeMathEditText = et
-                    v.requestFocus()
-                    mainHandler.postDelayed({
-                        imm.showSoftInput(v, InputMethodManager.SHOW_FORCED)
-                    }, 50)
+                if (event.action == MotionEvent.ACTION_DOWN || event.action == MotionEvent.ACTION_UP) {
+                    activateFieldInput(v)
                 }
                 false
             }
             et.setOnClickListener { v ->
-                if (trackAsMathField) activeMathEditText = et
-                v.requestFocus()
-                mainHandler.postDelayed({
-                    imm.showSoftInput(v, InputMethodManager.SHOW_IMPLICIT)
-                }, 60)
+                activateFieldInput(v)
             }
         }
 
@@ -1367,7 +1374,7 @@ class FloatingOverlayController(private val host: OverlayWindowHost) {
         popupParams = params
     }
 
-    @SuppressLint("SetJavaScriptEnabled")
+    @SuppressLint("SetJavaScriptEnabled", "ClickableViewAccessibility")
     private fun setupWebView(webView: WebView, tvUrl: TextView) {
         val s = webView.settings
         s.javaScriptEnabled = true
@@ -1386,6 +1393,26 @@ class FloatingOverlayController(private val host: OverlayWindowHost) {
             }
         }
         webView.webChromeClient = WebChromeClient()
+        webView.setOnTouchListener { _, event ->
+            if (event.action == MotionEvent.ACTION_DOWN) {
+                setPopupFocusable(true)
+            }
+            false
+        }
+    }
+
+    private fun setPopupFocusable(focusable: Boolean) {
+        val popup = popupView ?: return
+        val p = popupParams ?: return
+        val hasNotFocusable = (p.flags and WindowManager.LayoutParams.FLAG_NOT_FOCUSABLE) != 0
+        val wantNotFocusable = !focusable
+        if (hasNotFocusable == wantNotFocusable) return
+        p.flags = if (focusable) {
+            p.flags and WindowManager.LayoutParams.FLAG_NOT_FOCUSABLE.inv()
+        } else {
+            p.flags or WindowManager.LayoutParams.FLAG_NOT_FOCUSABLE
+        }
+        safeUpdateView(popup, p)
     }
 
     fun showPopup(tabIndex: Int = 0, initialQuery: String? = null) {
@@ -1411,6 +1438,11 @@ class FloatingOverlayController(private val host: OverlayWindowHost) {
     }
 
     fun hidePopup() {
+        popupView?.let { v ->
+            val imm = context.getSystemService(Context.INPUT_METHOD_SERVICE) as InputMethodManager
+            imm.hideSoftInputFromWindow(v.windowToken, 0)
+        }
+        setPopupFocusable(false)
         popupView?.visibility = View.GONE
         isPopupShowing = false
         showBubble()
