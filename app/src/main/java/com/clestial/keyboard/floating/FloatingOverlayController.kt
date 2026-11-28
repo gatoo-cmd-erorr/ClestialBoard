@@ -622,55 +622,73 @@ class FloatingOverlayController(private val host: OverlayWindowHost) {
         val btnAiClear = popup.findViewById<Button>(R.id.btnAiClear)
         val btnAiKeyToggle = popup.findViewById<Button>(R.id.btnAiKeyToggle)
         val panelAiKeyConfig = popup.findViewById<View>(R.id.panelAiKeyConfig)
+        val etAiBaseUrl = popup.findViewById<EditText>(R.id.etAiBaseUrl)
         val etAiApiKey = popup.findViewById<EditText>(R.id.etAiApiKey)
+        val etAiModel = popup.findViewById<EditText>(R.id.etAiModel)
+        val btnAiTestKey = popup.findViewById<Button>(R.id.btnAiTestKey)
         val btnAiSaveKey = popup.findViewById<Button>(R.id.btnAiSaveKey)
         val btnAiSubmit = popup.findViewById<Button>(R.id.btnAiSubmit)
         val btnAiCopy = popup.findViewById<Button>(R.id.btnAiCopy)
         etAiQuestionRef = etAi
         enableOverlayTyping(etAi)
+        enableOverlayTyping(etAiBaseUrl)
         enableOverlayTyping(etAiApiKey)
+        enableOverlayTyping(etAiModel)
 
-        if (prefs.chatGptApiKey.isNotEmpty()) {
+        fun syncAiConfigFields() {
+            etAiBaseUrl.setText(prefs.chatGptEndpoint)
             etAiApiKey.setText(prefs.chatGptApiKey)
+            etAiModel.setText(prefs.chatGptModel)
         }
+        syncAiConfigFields()
 
         btnAiKeyToggle.setOnClickListener {
-            panelAiKeyConfig.visibility = if (panelAiKeyConfig.visibility == View.VISIBLE) View.GONE else View.VISIBLE
+            val show = panelAiKeyConfig.visibility != View.VISIBLE
+            if (show) syncAiConfigFields()
+            panelAiKeyConfig.visibility = if (show) View.VISIBLE else View.GONE
         }
 
         btnAiSaveKey.setOnClickListener {
+            val rawUrl = etAiBaseUrl.text.toString().trim()
             val rawKey = etAiApiKey.text.toString().trim()
-            if (rawKey.isEmpty()) {
+            val rawModel = etAiModel.text.toString().trim()
+            if (rawUrl.isEmpty() && rawKey.isEmpty()) {
                 prefs.chatGptApiKey = ""
-                Toast.makeText(context, "API Key dihapus (mode offline aktif)", Toast.LENGTH_SHORT).show()
+                prefs.chatGptEndpoint = Prefs.DEFAULT_CHATGPT_ENDPOINT
+                prefs.chatGptModel = Prefs.DEFAULT_CHATGPT_MODEL
+                syncAiConfigFields()
+                Toast.makeText(context, "Konfigurasi AI direset (mode offline aktif)", Toast.LENGTH_SHORT).show()
                 panelAiKeyConfig.visibility = View.GONE
                 return@setOnClickListener
             }
-            when {
-                rawKey.startsWith("http://") || rawKey.startsWith("https://") -> {
-                    prefs.aiProxyUrl = rawKey
-                    Toast.makeText(context, "URL Proxy AI disimpan!", Toast.LENGTH_SHORT).show()
-                }
-                rawKey.startsWith("gsk_") -> {
-                    prefs.chatGptApiKey = rawKey
-                    prefs.chatGptEndpoint = "https://api.groq.com/openai/v1/chat/completions"
-                    prefs.chatGptModel = "llama-3.3-70b-versatile"
-                    Toast.makeText(context, "Groq API Key tersimpan!", Toast.LENGTH_SHORT).show()
-                }
-                rawKey.startsWith("sk-or-") -> {
-                    prefs.chatGptApiKey = rawKey
-                    prefs.chatGptEndpoint = "https://openrouter.ai/api/v1/chat/completions"
-                    prefs.chatGptModel = "openai/gpt-4o-mini"
-                    Toast.makeText(context, "OpenRouter API Key tersimpan!", Toast.LENGTH_SHORT).show()
-                }
-                else -> {
-                    prefs.chatGptApiKey = rawKey
-                    prefs.chatGptEndpoint = Prefs.DEFAULT_CHATGPT_ENDPOINT
-                    prefs.chatGptModel = Prefs.DEFAULT_CHATGPT_MODEL
-                    Toast.makeText(context, "OpenAI API Key tersimpan!", Toast.LENGTH_SHORT).show()
+            if (rawUrl.isNotEmpty() && AiRouterClient.normalizeBaseUrl(rawUrl) == null) {
+                Toast.makeText(context, "Base URL harus diawali http:// atau https://", Toast.LENGTH_SHORT).show()
+                return@setOnClickListener
+            }
+            val saved = AiRouterClient.saveDynamicConfig(prefs, rawUrl, rawKey, rawModel)
+            syncAiConfigFields()
+            Toast.makeText(context, saved.message, Toast.LENGTH_SHORT).show()
+            panelAiKeyConfig.visibility = View.GONE
+        }
+
+        btnAiTestKey.setOnClickListener {
+            val rawUrl = etAiBaseUrl.text.toString().trim()
+            val rawKey = etAiApiKey.text.toString().trim()
+            val rawModel = etAiModel.text.toString().trim()
+            if (rawUrl.isNotEmpty() && AiRouterClient.normalizeBaseUrl(rawUrl) == null) {
+                Toast.makeText(context, "Base URL harus diawali http:// atau https://", Toast.LENGTH_SHORT).show()
+                return@setOnClickListener
+            }
+            AiRouterClient.saveDynamicConfig(prefs, rawUrl, rawKey, rawModel)
+            syncAiConfigFields()
+            tvAiResponse.text = "Menguji koneksi ke ${AiRouterClient.resolveModelsEndpoint(prefs.chatGptEndpoint)}..."
+            btnAiTestKey.isEnabled = false
+            AiRouterClient.testConnection(prefs) { res ->
+                mainHandler.post {
+                    btnAiTestKey.isEnabled = true
+                    tvAiResponse.text = res.message
                 }
             }
-            panelAiKeyConfig.visibility = View.GONE
         }
 
         val cm = context.getSystemService(Context.CLIPBOARD_SERVICE) as ClipboardManager
@@ -697,10 +715,7 @@ class FloatingOverlayController(private val host: OverlayWindowHost) {
                 return@setOnClickListener
             }
 
-            val hasApiKey = prefs.chatGptApiKey.isNotBlank()
-            val hasCustomProxy = prefs.aiProxyUrl.isNotBlank() && !prefs.aiProxyUrl.contains("10.0.2.2")
-
-            if (!hasApiKey && !hasCustomProxy) {
+            if (!AiRouterClient.hasConfiguredEndpoint(prefs)) {
                 val abcd = AbcdSolver.parseFromText(q)
                 if (abcd != null) {
                     val sol = AbcdSolver.solveLocally(abcd)
@@ -712,9 +727,9 @@ class FloatingOverlayController(private val host: OverlayWindowHost) {
                     tvAiResponse.text = offlineMath
                     return@setOnClickListener
                 }
-                tvAiResponse.text = "Belum ada API Key AI yang diisi.\n\n" +
+                tvAiResponse.text = "Belum ada Base URL / API Key AI yang diisi.\n\n" +
                     "• Untuk soal Matematika (SPLDV, PLSV, Kuadrat, 5C2, 5!), ketik persamaannya langsung di sini atau buka tab ∑ Kalkulator.\n" +
-                    "• Untuk pertanyaan umum / esai, ketuk tombol '🔑 Key' di atas dan tempel API Key OpenAI (sk-...), Groq gratis (gsk_...), atau OpenRouter (sk-or-...)."
+                    "• Untuk AI (9router / OpenAI / Groq / OpenRouter), ketuk '🔑 Key' di atas atau buka menu Pengaturan / Tools untuk mengisi Base URL & API Key."
                 return@setOnClickListener
             }
 

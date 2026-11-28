@@ -5735,41 +5735,21 @@ class ClestialKeyboardView(context: Context) : View(context) {
         val q = aiInput.trim()
         if (q.isEmpty() || aiBusy) return
 
-        // Jika pengguna memasukkan atau menempelkan API Key / URL proxy langsung
-        if ((q.startsWith("sk-") || q.startsWith("gsk_") || q.startsWith("http://") || q.startsWith("https://")) && q.length > 15) {
-            when {
-                q.startsWith("http://") || q.startsWith("https://") -> {
-                    prefs.aiProxyUrl = q
-                    aiResult = "URL Proxy AI disimpan! Ketik pertanyaan Anda."
-                }
-                q.startsWith("gsk_") -> {
-                    prefs.chatGptApiKey = q
-                    prefs.chatGptEndpoint = "https://api.groq.com/openai/v1/chat/completions"
-                    prefs.chatGptModel = "llama-3.3-70b-versatile"
-                    aiResult = "Groq API Key tersimpan dan aktif!"
-                }
-                q.startsWith("sk-or-") -> {
-                    prefs.chatGptApiKey = q
-                    prefs.chatGptEndpoint = "https://openrouter.ai/api/v1/chat/completions"
-                    prefs.chatGptModel = "openai/gpt-4o-mini"
-                    aiResult = "OpenRouter API Key tersimpan dan aktif!"
-                }
-                else -> {
-                    prefs.chatGptApiKey = q
-                    prefs.chatGptEndpoint = Prefs.DEFAULT_CHATGPT_ENDPOINT
-                    prefs.chatGptModel = Prefs.DEFAULT_CHATGPT_MODEL
-                    aiResult = "Kunci API ChatGPT berhasil disimpan dan aktif!"
-                }
-            }
+        // Jika pengguna memasukkan atau menempelkan API Key / Base URL / URL|KEY|MODEL langsung
+        val looksLikeConfig = q.contains("|") ||
+            q.startsWith("http://") ||
+            q.startsWith("https://") ||
+            ((q.startsWith("sk-") || q.startsWith("gsk_") || q.startsWith("sess-")) && q.length > 15)
+        if (looksLikeConfig) {
+            val saved = AiRouterClient.saveQuickInput(prefs, q)
+            aiResult = saved.message
             aiInput = ""
             aiCursor = 0
             invalidate()
             return
         }
 
-        val hasApiKey = prefs.chatGptApiKey.isNotBlank()
-        val hasCustomProxy = prefs.aiProxyUrl.isNotBlank() && !prefs.aiProxyUrl.contains("10.0.2.2")
-        if (!hasApiKey && !hasCustomProxy) {
+        if (!AiRouterClient.hasConfiguredEndpoint(prefs)) {
             val abcd = AbcdSolver.parseFromText(q)
             if (abcd != null) {
                 val sol = AbcdSolver.solveLocally(abcd)
@@ -5972,19 +5952,25 @@ class ClestialKeyboardView(context: Context) : View(context) {
                             AI_T_KEY -> {
                                 val cm = context.getSystemService(Context.CLIPBOARD_SERVICE) as? ClipboardManager
                                 val clipText = cm?.primaryClip?.getItemAt(0)?.text?.toString()?.trim()
-                                if (clipText != null && (clipText.startsWith("sk-") || clipText.startsWith("sess-")) && clipText.length > 20) {
-                                    prefs.chatGptApiKey = clipText
+                                val isClipConfig = clipText != null && (
+                                    clipText.startsWith("http://") ||
+                                        clipText.startsWith("https://") ||
+                                        clipText.contains("|") ||
+                                        ((clipText.startsWith("sk-") || clipText.startsWith("gsk_") || clipText.startsWith("sess-")) && clipText.length > 15)
+                                    )
+                                if (isClipConfig && clipText != null) {
+                                    val saved = AiRouterClient.saveQuickInput(prefs, clipText)
                                     aiInput = ""
                                     aiCursor = 0
-                                    aiResult = "Akun ChatGPT terhubung!\n(Key: ${clipText.take(7)}...${clipText.takeLast(4)})\nSilakan ketik pertanyaan atau soal tugas Anda lalu tekan Enter."
-                                } else if (prefs.chatGptApiKey.isNotEmpty()) {
-                                    aiInput = prefs.chatGptApiKey
+                                    aiResult = saved.message
+                                } else if (AiRouterClient.hasConfiguredEndpoint(prefs)) {
+                                    aiInput = "${prefs.chatGptEndpoint}|${prefs.chatGptApiKey}|${prefs.chatGptModel}"
                                     aiCursor = aiInput.length
-                                    aiResult = "Kunci API aktif: ${prefs.chatGptApiKey.take(7)}...${prefs.chatGptApiKey.takeLast(4)}\nEdit atau tempel kunci baru lalu tekan Enter."
+                                    aiResult = "Base URL: ${prefs.chatGptEndpoint}\nKey: ${AiRouterClient.maskKey(prefs.chatGptApiKey)} | Model: ${prefs.chatGptModel}\nEdit URL|KEY|MODEL lalu tekan Enter."
                                 } else {
-                                    aiInput = "sk-"
+                                    aiInput = "https://"
                                     aiCursor = aiInput.length
-                                    aiResult = "Salin OpenAI API Key Anda (sk-...) dari platform/browser, lalu ketuk tombol ini lagi untuk langsung menautkannya, atau ketik manual dan tekan Enter."
+                                    aiResult = "Tempel Base URL (https://...), API Key (sk-...), atau format URL|KEY|MODEL, lalu tekan Enter (atau atur di menu Pengaturan / Tools)."
                                 }
                                 aiEnsureCursorVisible()
                             }

@@ -274,7 +274,7 @@ class PreferencesActivity : AppCompatActivity() {
         @StringRes title: Int,
         @StringRes desc: Int,
         onClick: () -> Unit
-    ) {
+    ): View {
         val row = layoutInflater.inflate(R.layout.item_pref_switch, card, false)
         row.findViewById<View>(R.id.prefSwitch).visibility = View.GONE
         row.findViewById<TextView>(R.id.prefTitle).setText(title)
@@ -283,6 +283,7 @@ class PreferencesActivity : AppCompatActivity() {
 
         if (card.childCount > 0) addDivider(card)
         card.addView(row)
+        return row
     }
 
     private fun confirmClearLearned() {
@@ -367,6 +368,37 @@ class PreferencesActivity : AppCompatActivity() {
         addAction(
             clipboard, R.string.pref_clip_clear_title, R.string.pref_clip_clear_desc
         ) { confirmClearClipboard() }
+
+        // Konfigurasi AI & 9router (Base URL, API Key, Model dinamis)
+        addSection(R.string.sec_ai_config)
+        val aiCard = newCard()
+        lateinit var rowBaseUrl: View
+        lateinit var rowApiKey: View
+        lateinit var rowModel: View
+        lateinit var rowTestAi: View
+
+        fun refreshAiSummary() {
+            rowBaseUrl.findViewById<TextView>(R.id.prefDesc).text = prefs.chatGptEndpoint
+            rowApiKey.findViewById<TextView>(R.id.prefDesc).text =
+                com.clestial.keyboard.math.AiRouterClient.maskKey(prefs.chatGptApiKey)
+            rowModel.findViewById<TextView>(R.id.prefDesc).text = prefs.chatGptModel
+        }
+
+        val openAiDialog = {
+            AiConfigDialog.show(this, prefs) { refreshAiSummary() }
+        }
+        rowBaseUrl = addAction(aiCard, R.string.ai_cfg_base_url_title, R.string.ai_cfg_base_url_hint) { openAiDialog() }
+        rowApiKey = addAction(aiCard, R.string.ai_cfg_api_key_title, R.string.ai_cfg_api_key_hint) { openAiDialog() }
+        rowModel = addAction(aiCard, R.string.ai_cfg_model_title, R.string.ai_cfg_model_hint) { openAiDialog() }
+        rowTestAi = addAction(aiCard, R.string.ai_cfg_test_title, R.string.ai_cfg_test_desc) {
+            val descView = rowTestAi.findViewById<TextView>(R.id.prefDesc)
+            descView.text = "Menguji koneksi..."
+            com.clestial.keyboard.math.AiRouterClient.testConnection(prefs) { res ->
+                descView.text = res.message
+                Toast.makeText(this, res.message, Toast.LENGTH_LONG).show()
+            }
+        }
+        refreshAiSummary()
     }
 
     /** Halaman Paket Unduhan: data bahasa terjemahan, diunduh dan dihapus manual. */

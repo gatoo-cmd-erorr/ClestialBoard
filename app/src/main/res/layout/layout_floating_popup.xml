@@ -209,46 +209,96 @@
                     android:textStyle="bold" />
             </LinearLayout>
 
-            <!-- Panel Pengaturan API Key Inline -->
+            <!-- Panel Pengaturan Base URL, API Key & Model Inline -->
             <LinearLayout
                 android:id="@+id/panelAiKeyConfig"
                 android:layout_width="match_parent"
                 android:layout_height="wrap_content"
                 android:layout_marginTop="6dp"
                 android:background="@drawable/bg_floating_card"
-                android:orientation="horizontal"
-                android:padding="6dp"
+                android:orientation="vertical"
+                android:padding="8dp"
                 android:visibility="gone">
 
                 <EditText
-                    android:id="@+id/etAiApiKey"
-                    android:layout_width="0dp"
-                    android:layout_height="36dp"
-                    android:layout_weight="1"
+                    android:id="@+id/etAiBaseUrl"
+                    android:layout_width="match_parent"
+                    android:layout_height="34dp"
                     android:background="@drawable/bg_floating_input"
-                    android:hint="Tempel sk-... / gsk_... / URL proxy"
+                    android:hint="Base URL (mis. https://.../v1 atau http://ip:20128/v1)"
+                    android:inputType="textUri|textNoSuggestions"
+                    android:maxLines="1"
+                    android:paddingHorizontal="8dp"
+                    android:textColor="#F8FAFC"
+                    android:textColorHint="#64748B"
+                    android:textSize="11sp" />
+
+                <EditText
+                    android:id="@+id/etAiApiKey"
+                    android:layout_width="match_parent"
+                    android:layout_height="34dp"
+                    android:layout_marginTop="6dp"
+                    android:background="@drawable/bg_floating_input"
+                    android:hint="API Key (sk-... / gsk_... / sk-or-...)"
                     android:inputType="textNoSuggestions"
                     android:maxLines="1"
                     android:paddingHorizontal="8dp"
                     android:textColor="#F8FAFC"
                     android:textColorHint="#64748B"
-                    android:textSize="11.5sp" />
+                    android:textSize="11sp" />
 
-                <androidx.appcompat.widget.AppCompatButton
-                    android:id="@+id/btnAiSaveKey"
-                    android:layout_width="wrap_content"
-                    android:layout_height="36dp"
-                    android:layout_marginStart="6dp"
-                    android:background="@drawable/bg_floating_btn"
-                    android:minHeight="0dp"
-                    android:minWidth="0dp"
-                    android:paddingHorizontal="12dp"
-                    android:stateListAnimator="@null"
-                    android:text="Simpan"
-                    android:textAllCaps="false"
-                    android:textColor="#FFFFFF"
-                    android:textSize="11.5sp"
-                    android:textStyle="bold" />
+                <LinearLayout
+                    android:layout_width="match_parent"
+                    android:layout_height="34dp"
+                    android:layout_marginTop="6dp"
+                    android:orientation="horizontal">
+
+                    <EditText
+                        android:id="@+id/etAiModel"
+                        android:layout_width="0dp"
+                        android:layout_height="match_parent"
+                        android:layout_weight="1"
+                        android:background="@drawable/bg_floating_input"
+                        android:hint="Model / Combo (mis. gpt-4o-mini)"
+                        android:inputType="textNoSuggestions"
+                        android:maxLines="1"
+                        android:paddingHorizontal="8dp"
+                        android:textColor="#F8FAFC"
+                        android:textColorHint="#64748B"
+                        android:textSize="11sp" />
+
+                    <androidx.appcompat.widget.AppCompatButton
+                        android:id="@+id/btnAiTestKey"
+                        android:layout_width="wrap_content"
+                        android:layout_height="match_parent"
+                        android:layout_marginStart="6dp"
+                        android:background="@drawable/bg_floating_pill"
+                        android:minHeight="0dp"
+                        android:minWidth="0dp"
+                        android:paddingHorizontal="10dp"
+                        android:stateListAnimator="@null"
+                        android:text="Tes"
+                        android:textAllCaps="false"
+                        android:textColor="#38BDF8"
+                        android:textSize="11sp"
+                        android:textStyle="bold" />
+
+                    <androidx.appcompat.widget.AppCompatButton
+                        android:id="@+id/btnAiSaveKey"
+                        android:layout_width="wrap_content"
+                        android:layout_height="match_parent"
+                        android:layout_marginStart="6dp"
+                        android:background="@drawable/bg_floating_btn"
+                        android:minHeight="0dp"
+                        android:minWidth="0dp"
+                        android:paddingHorizontal="12dp"
+                        android:stateListAnimator="@null"
+                        android:text="Simpan"
+                        android:textAllCaps="false"
+                        android:textColor="#FFFFFF"
+                        android:textSize="11sp"
+                        android:textStyle="bold" />
+                </LinearLayout>
             </LinearLayout>
 
             <ScrollView

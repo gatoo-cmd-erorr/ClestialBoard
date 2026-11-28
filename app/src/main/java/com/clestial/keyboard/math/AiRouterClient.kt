@@ -19,11 +19,25 @@ import java.util.concurrent.Executors
  */
 object AiRouterClient {
 
-    private const val CONNECT_TIMEOUT_MS = 6_000
-    private const val READ_TIMEOUT_MS = 12_000
+    private const val CONNECT_TIMEOUT_MS = 8_000
+    private const val READ_TIMEOUT_MS = 25_000
     private const val MAX_RETRIES = 1
     private const val RATE_WINDOW_MS = 60_000L
     private const val MAX_PER_MINUTE = 10
+
+    data class ConfigSummary(
+        val endpoint: String,
+        val apiKey: String,
+        val model: String,
+        val message: String
+    )
+
+    data class ConnectionTestResult(
+        val ok: Boolean,
+        val endpoint: String = "",
+        val models: List<String> = emptyList(),
+        val message: String = ""
+    )
 
     private val executor = Executors.newSingleThreadExecutor()
     private val mainHandler by lazy { Handler(Looper.getMainLooper()) }
@@ -356,32 +370,207 @@ object AiRouterClient {
     }
 
     /** Tanya AI dengan preferensi pengguna (prioritas: ChatGPT akun/key, fallback: 9router). */
-    fun askQuestion(prefs: Prefs, question: String, onDone: (TextAiResult) -> Unit) {
-        val apiKey = prefs.chatGptApiKey.trim()
-        if (apiKey.isNotEmpty()) {
-            askChatGPT(apiKey, prefs.chatGptEndpoint, prefs.chatGptModel, question, onDone)
-        } else {
-            val base = sanitizeProxyUrl(prefs.aiProxyUrl)
-            if (base != null && !base.contains("10.0.2.2")) {
-                askQuestion(base, question, onDone)
-            } else {
-                onDone(TextAiResult(false, error = "Kunci API ChatGPT belum diisi. Masukkan OpenAI API Key (sk-...) melalui tombol Akun/Key di atas."))
+    fun normalizeBaseUrl(rawUrl: String): String? = sanitizeProxyUrl(rawUrl)
+
+    fun resolveChatCompletionsEndpoint(rawUrl: String): String {
+        val clean = sanitizeProxyUrl(rawUrl) ?: return Prefs.DEFAULT_CHATGPT_ENDPOINT
+        return when {
+            clean.endsWith("/chat/completions") -> clean
+            clean.endsWith("/v1") -> "$clean/chat/completions"
+            else -> "$clean/v1/chat/completions"
+        }
+    }
+
+    fun resolveModelsEndpoint(rawUrl: String): String {
+        val clean = sanitizeProxyUrl(rawUrl) ?: return "https://api.openai.com/v1/models"
+        return when {
+            clean.endsWith("/chat/completions") -> clean.removeSuffix("/chat/completions") + "/models"
+            clean.endsWith("/v1") -> "$clean/models"
+            else -> "$clean/v1/models"
+        }
+    }
+
+    fun isCustomOpenAiEndpoint(rawUrl: String): Boolean {
+        val resolved = resolveChatCompletionsEndpoint(rawUrl)
+        return sanitizeProxyUrl(rawUrl) != null && resolved != Prefs.DEFAULT_CHATGPT_ENDPOINT
+    }
+
+    fun hasConfiguredEndpoint(prefs: Prefs): Boolean {
+        if (prefs.chatGptApiKey.isNotBlank()) return true
+        if (isCustomOpenAiEndpoint(prefs.chatGptEndpoint)) return true
+        val proxy = sanitizeProxyUrl(prefs.aiProxyUrl)
+        return proxy != null && !proxy.contains("10.0.2.2")
+    }
+
+    fun maskKey(apiKey: String): String {
+        val clean = apiKey.trim()
+        return when {
+            clean.isEmpty() -> "Kosong"
+            clean.length <= 10 -> clean.take(3) + "***"
+            else -> "${clean.take(7)}...${clean.takeLast(4)}"
+        }
+    }
+
+    fun saveDynamicConfig(
+        prefs: Prefs,
+        baseUrlInput: String,
+        apiKeyInput: String,
+        modelInput: String = ""
+    ): ConfigSummary {
+        val rawUrl = baseUrlInput.trim()
+        val rawKey = apiKeyInput.trim()
+        val rawModel = modelInput.trim()
+
+        val resolvedUrl: String
+        val resolvedModel: String
+
+        if (rawUrl.isNotEmpty()) {
+            resolvedUrl = sanitizeProxyUrl(rawUrl) ?: Prefs.DEFAULT_CHATGPT_ENDPOINT
+            resolvedModel = when {
+                rawModel.isNotEmpty() -> rawModel
+                rawUrl.contains("groq.com", ignoreCase = true) -> "llama-3.3-70b-versatile"
+                rawUrl.contains("openrouter.ai", ignoreCase = true) -> "openai/gpt-4o-mini"
+                else -> prefs.chatGptModel.ifBlank { Prefs.DEFAULT_CHATGPT_MODEL }
             }
+        } else {
+            when {
+                rawKey.startsWith("gsk_") -> {
+                    resolvedUrl = "https://api.groq.com/openai/v1/chat/completions"
+                    resolvedModel = rawModel.ifEmpty { "llama-3.3-70b-versatile" }
+                }
+                rawKey.startsWith("sk-or-") -> {
+                    resolvedUrl = "https://openrouter.ai/api/v1/chat/completions"
+                    resolvedModel = rawModel.ifEmpty { "openai/gpt-4o-mini" }
+                }
+                else -> {
+                    resolvedUrl = if (isCustomOpenAiEndpoint(prefs.chatGptEndpoint)) {
+                        prefs.chatGptEndpoint
+                    } else {
+                        Prefs.DEFAULT_CHATGPT_ENDPOINT
+                    }
+                    resolvedModel = rawModel.ifEmpty { prefs.chatGptModel.ifBlank { Prefs.DEFAULT_CHATGPT_MODEL } }
+                }
+            }
+        }
+
+        prefs.chatGptEndpoint = resolvedUrl
+        prefs.chatGptApiKey = rawKey
+        prefs.chatGptModel = resolvedModel
+
+        val msg = "Tersimpan! Base URL: $resolvedUrl | Key: ${maskKey(rawKey)} | Model: $resolvedModel"
+        return ConfigSummary(resolvedUrl, rawKey, resolvedModel, msg)
+    }
+
+    fun saveQuickInput(prefs: Prefs, rawInput: String): ConfigSummary {
+        val trimmed = rawInput.trim()
+        if (trimmed.contains("|")) {
+            val parts = trimmed.split("|").map { it.trim() }
+            return saveDynamicConfig(
+                prefs,
+                parts.getOrNull(0).orEmpty(),
+                parts.getOrNull(1).orEmpty(),
+                parts.getOrNull(2).orEmpty()
+            )
+        }
+        if (trimmed.startsWith("http://") || trimmed.startsWith("https://")) {
+            return saveDynamicConfig(prefs, trimmed, prefs.chatGptApiKey, prefs.chatGptModel)
+        }
+        return saveDynamicConfig(prefs, "", trimmed, prefs.chatGptModel)
+    }
+
+    private fun shouldUseOpenAiCompatible(prefs: Prefs): Boolean {
+        return prefs.chatGptApiKey.isNotBlank() || isCustomOpenAiEndpoint(prefs.chatGptEndpoint)
+    }
+
+    private fun customLegacyProxy(prefs: Prefs): String? {
+        val base = sanitizeProxyUrl(prefs.aiProxyUrl)
+        return if (base != null && !base.contains("10.0.2.2")) base else null
+    }
+
+    fun testConnection(prefs: Prefs, onDone: (ConnectionTestResult) -> Unit) {
+        val rawEndpoint = prefs.chatGptEndpoint.trim()
+        val apiKey = prefs.chatGptApiKey.trim()
+        if (rawEndpoint.isEmpty()) {
+            onDone(ConnectionTestResult(ok = false, message = "Base URL belum diisi."))
+            return
+        }
+        val modelsUrl = resolveModelsEndpoint(rawEndpoint)
+        val chatUrl = resolveChatCompletionsEndpoint(rawEndpoint)
+        executor.execute {
+            var conn: HttpURLConnection? = null
+            val out = try {
+                conn = (URL(modelsUrl).openConnection() as HttpURLConnection).apply {
+                    requestMethod = "GET"
+                    connectTimeout = CONNECT_TIMEOUT_MS
+                    readTimeout = READ_TIMEOUT_MS
+                    setRequestProperty("Accept", "application/json")
+                    if (apiKey.isNotEmpty()) {
+                        setRequestProperty("Authorization", "Bearer $apiKey")
+                    }
+                }
+                val code = conn.responseCode
+                val stream = if (code in 200..299) conn.inputStream else conn.errorStream
+                val body = stream?.let { BufferedReader(InputStreamReader(it, Charsets.UTF_8)).readText() } ?: ""
+                if (code in 200..299) {
+                    val models = parseModelIds(body)
+                    val summary = if (models.isNotEmpty()) {
+                        "Terhubung ke $modelsUrl (HTTP $code). Model (${models.size}): ${models.take(5).joinToString(", ")}"
+                    } else {
+                        "Terhubung ke $modelsUrl (HTTP $code)."
+                    }
+                    ConnectionTestResult(ok = true, endpoint = chatUrl, models = models, message = summary)
+                } else {
+                    ConnectionTestResult(
+                        ok = false,
+                        endpoint = chatUrl,
+                        message = "Gagal HTTP $code dari $modelsUrl${if (body.isNotBlank()) ": ${body.take(140)}" else ""}"
+                    )
+                }
+            } catch (e: Exception) {
+                ConnectionTestResult(
+                    ok = false,
+                    endpoint = chatUrl,
+                    message = "Gagal terhubung ke $modelsUrl: ${e.message ?: "Timeout / jaringan tidak terjangkau"}"
+                )
+            } finally {
+                conn?.disconnect()
+            }
+            mainHandler.post { onDone(out) }
+        }
+    }
+
+    internal fun parseModelIds(rawJson: String): List<String> {
+        val parsed = extractJsonMap(rawJson) ?: return emptyList()
+        val list = parsed["data"] as? List<*> ?: return emptyList()
+        return list.mapNotNull { item ->
+            (item as? Map<*, *>)?.get("id")?.toString()?.trim()?.takeIf { it.isNotEmpty() }
+        }
+    }
+
+    fun askQuestion(prefs: Prefs, question: String, onDone: (TextAiResult) -> Unit) {
+        if (shouldUseOpenAiCompatible(prefs)) {
+            askChatGPT(prefs.chatGptApiKey, prefs.chatGptEndpoint, prefs.chatGptModel, question, onDone)
+            return
+        }
+        val base = customLegacyProxy(prefs)
+        if (base != null) {
+            askQuestion(base, question, onDone)
+        } else {
+            onDone(TextAiResult(false, error = "Base URL & API Key AI belum diisi. Atur lewat tombol Key atau Setting/Tools."))
         }
     }
 
     /** Tafsir soal cerita dengan preferensi pengguna (prioritas: ChatGPT akun/key, fallback: 9router). */
     fun parseStoryProblem(prefs: Prefs, storyText: String, onDone: (ParsedMathIntent) -> Unit) {
-        val apiKey = prefs.chatGptApiKey.trim()
-        if (apiKey.isNotEmpty()) {
-            parseStoryProblemChatGPT(apiKey, prefs.chatGptEndpoint, prefs.chatGptModel, storyText, onDone)
+        if (shouldUseOpenAiCompatible(prefs)) {
+            parseStoryProblemChatGPT(prefs.chatGptApiKey, prefs.chatGptEndpoint, prefs.chatGptModel, storyText, onDone)
+            return
+        }
+        val base = customLegacyProxy(prefs)
+        if (base != null) {
+            parseStoryProblem(base, storyText, onDone)
         } else {
-            val base = sanitizeProxyUrl(prefs.aiProxyUrl)
-            if (base != null && !base.contains("10.0.2.2")) {
-                parseStoryProblem(base, storyText, onDone)
-            } else {
-                onDone(ParsedMathIntent(false, error = "Kunci API ChatGPT belum diisi. Masukkan OpenAI API Key (sk-...) melalui tombol Akun/Key."))
-            }
+            onDone(ParsedMathIntent(false, error = "Base URL & API Key AI belum diisi. Atur lewat tombol Key atau Setting/Tools."))
         }
     }
 
@@ -393,16 +582,15 @@ object AiRouterClient {
         solveResult: SolveResult,
         onDone: (TextAiResult) -> Unit
     ) {
-        val apiKey = prefs.chatGptApiKey.trim()
-        if (apiKey.isNotEmpty()) {
-            explainSolutionChatGPT(apiKey, prefs.chatGptEndpoint, prefs.chatGptModel, moduleId, storyText, solveResult, onDone)
+        if (shouldUseOpenAiCompatible(prefs)) {
+            explainSolutionChatGPT(prefs.chatGptApiKey, prefs.chatGptEndpoint, prefs.chatGptModel, moduleId, storyText, solveResult, onDone)
+            return
+        }
+        val base = customLegacyProxy(prefs)
+        if (base != null) {
+            explainSolution(base, moduleId, storyText, solveResult, onDone)
         } else {
-            val base = sanitizeProxyUrl(prefs.aiProxyUrl)
-            if (base != null && !base.contains("10.0.2.2")) {
-                explainSolution(base, moduleId, storyText, solveResult, onDone)
-            } else {
-                onDone(TextAiResult(false, error = "Kunci API ChatGPT belum diisi."))
-            }
+            onDone(TextAiResult(false, error = "Base URL & API Key AI belum diisi."))
         }
     }
 
@@ -420,8 +608,9 @@ object AiRouterClient {
             return
         }
         val cleanKey = apiKey.trim()
-        if (cleanKey.isEmpty()) {
-            onDone(TextAiResult(false, error = "Kunci API ChatGPT belum diisi. Masukkan OpenAI API Key (sk-...) di tombol Key/Akun."))
+        val ep = resolveChatCompletionsEndpoint(endpoint)
+        if (cleanKey.isEmpty() && ep == Prefs.DEFAULT_CHATGPT_ENDPOINT) {
+            onDone(TextAiResult(false, error = "Base URL / API Key AI belum diisi. Atur melalui tombol Key atau Setting/Tools."))
             return
         }
         if (!acquireRateSlot()) {
@@ -446,13 +635,12 @@ object AiRouterClient {
                 put("temperature", 0.6)
             }.toString()
 
-            val ep = if (endpoint.isNotBlank()) endpoint.trim() else Prefs.DEFAULT_CHATGPT_ENDPOINT
             val res = postChatGpt(ep, cleanKey, reqJson)
             mainHandler.post { onDone(res) }
         }
     }
 
-    /** Tafsir soal cerita langsung via ChatGPT API. */
+    /** Tafsir soal cerita langsung via ChatGPT / OpenAI-compatible API. */
     fun parseStoryProblemChatGPT(
         apiKey: String,
         endpoint: String = Prefs.DEFAULT_CHATGPT_ENDPOINT,
@@ -466,8 +654,9 @@ object AiRouterClient {
             return
         }
         val cleanKey = apiKey.trim()
-        if (cleanKey.isEmpty()) {
-            onDone(ParsedMathIntent(false, error = "Kunci API ChatGPT belum diisi. Masukkan OpenAI API Key (sk-...) di tombol Key/Akun."))
+        val ep = resolveChatCompletionsEndpoint(endpoint)
+        if (cleanKey.isEmpty() && ep == Prefs.DEFAULT_CHATGPT_ENDPOINT) {
+            onDone(ParsedMathIntent(false, error = "Base URL / API Key AI belum diisi. Atur melalui tombol Key atau Setting/Tools."))
             return
         }
         if (!acquireRateSlot()) {
@@ -513,7 +702,6 @@ Hanya kembalikan JSON tanpa penjelasan tambahan dan tanpa markdown fence.
                 put("temperature", 0.1)
             }.toString()
 
-            val ep = if (endpoint.isNotBlank()) endpoint.trim() else Prefs.DEFAULT_CHATGPT_ENDPOINT
             val net = postChatGpt(ep, cleanKey, reqJson)
             val result = if (!net.ok) {
                 ParsedMathIntent(false, error = net.error)
@@ -525,7 +713,7 @@ Hanya kembalikan JSON tanpa penjelasan tambahan dan tanpa markdown fence.
         }
     }
 
-    /** Penjelasan langkah penyelesaian soal via ChatGPT API. */
+    /** Penjelasan langkah penyelesaian soal via ChatGPT / OpenAI-compatible API. */
     fun explainSolutionChatGPT(
         apiKey: String,
         endpoint: String = Prefs.DEFAULT_CHATGPT_ENDPOINT,
@@ -536,8 +724,9 @@ Hanya kembalikan JSON tanpa penjelasan tambahan dan tanpa markdown fence.
         onDone: (TextAiResult) -> Unit
     ) {
         val cleanKey = apiKey.trim()
-        if (cleanKey.isEmpty()) {
-            onDone(TextAiResult(false, error = "Kunci API ChatGPT belum diisi."))
+        val ep = resolveChatCompletionsEndpoint(endpoint)
+        if (cleanKey.isEmpty() && ep == Prefs.DEFAULT_CHATGPT_ENDPOINT) {
+            onDone(TextAiResult(false, error = "Base URL / API Key AI belum diisi."))
             return
         }
         if (!acquireRateSlot()) {
@@ -572,7 +761,6 @@ Cek: ${solveResult.check}
                 put("temperature", 0.5)
             }.toString()
 
-            val ep = if (endpoint.isNotBlank()) endpoint.trim() else Prefs.DEFAULT_CHATGPT_ENDPOINT
             val res = postChatGpt(ep, cleanKey, reqJson)
             mainHandler.post { onDone(res) }
         }
@@ -676,7 +864,9 @@ Cek: ${solveResult.check}
                     readTimeout = READ_TIMEOUT_MS
                     doOutput = true
                     setRequestProperty("Content-Type", "application/json; charset=utf-8")
-                    setRequestProperty("Authorization", "Bearer $apiKey")
+                    if (apiKey.isNotBlank()) {
+                        setRequestProperty("Authorization", "Bearer $apiKey")
+                    }
                 }
                 OutputStreamWriter(conn.outputStream, Charsets.UTF_8).use { it.write(jsonBody) }
                 val code = conn.responseCode
@@ -697,17 +887,21 @@ Cek: ${solveResult.check}
                     if (reply.isNotEmpty()) {
                         return TextAiResult(ok = true, text = reply.trim(), model = extractModel(respText))
                     }
-                    return TextAiResult(ok = false, error = "Respons ChatGPT kosong.")
+                    return TextAiResult(ok = false, error = "Respons AI kosong.")
                 }
                 val errMsg = try {
                     val root = JSONObject(respText)
                     val err = root.optJSONObject("error")
-                    err?.optString("message") ?: "Error $code dari ChatGPT."
+                    err?.optString("message")?.takeIf { it.isNotBlank() }
+                        ?: root.optString("detail").takeIf { it.isNotBlank() }
+                        ?: root.optString("message").takeIf { it.isNotBlank() }
+                        ?: "Error $code dari server AI ($endpoint)."
                 } catch (e: Exception) {
                     when (code) {
-                        401 -> "Kunci API ChatGPT tidak valid atau salah. Periksa kembali API Key Anda."
-                        429 -> "Batas kuota ChatGPT tercapai (Rate Limit / Quota Exceeded)."
-                        else -> "Server ChatGPT mengembalikan kode error $code."
+                        401 -> "API Key tidak valid atau salah (401). Periksa kembali API Key Anda."
+                        404 -> "Endpoint tidak ditemukan (404). Periksa Base URL Anda."
+                        429 -> "Batas kuota tercapai (429 / Rate Limit)."
+                        else -> "Server AI mengembalikan kode error $code."
                     }
                 }
                 lastError = errMsg
@@ -715,7 +909,7 @@ Cek: ${solveResult.check}
                     return TextAiResult(ok = false, error = lastError)
                 }
             } catch (e: Exception) {
-                lastError = "Koneksi ke ChatGPT gagal atau timeout. Periksa internet atau API Key."
+                lastError = "Koneksi ke $endpoint gagal atau timeout: ${e.message ?: "periksa internet & URL"}."
             } finally {
                 conn?.disconnect()
             }
