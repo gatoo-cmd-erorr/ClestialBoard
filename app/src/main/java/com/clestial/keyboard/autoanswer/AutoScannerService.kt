@@ -129,23 +129,38 @@ class AutoScannerService : AccessibilityService() {
             return false
         }
 
+        if (preferNodeOnly) {
+            return tryClickUnpinNode()
+        }
+        return forceUnpinSystem()
+    }
+
+    fun forceUnpinSystem(): Boolean {
+        val am = getSystemService(Context.ACTIVITY_SERVICE) as? ActivityManager ?: return false
+        val lockState = am.lockTaskModeState
+        if (lockState != ActivityManager.LOCK_TASK_MODE_PINNED &&
+            lockState != ActivityManager.LOCK_TASK_MODE_LOCKED
+        ) {
+            return false
+        }
+
         if (tryClickUnpinNode()) {
             emitStatus("Mode Semat terdeteksi: tombol keluar/unpin diklik otomatis.")
             return true
-        }
-
-        if (preferNodeOnly) {
-            return false
         }
 
         emitStatus("Mode Semat (Screen Pinning) terdeteksi, melepaskan sematan...")
         performGlobalAction(GLOBAL_ACTION_RECENTS)
         mainHandler.postDelayed({
             performGlobalAction(GLOBAL_ACTION_BACK)
-            mainHandler.postDelayed({
-                tryClickUnpinNode()
-            }, 250L)
-        }, 500L)
+            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.N) {
+                dispatchVerticalSwipe(startYRatio = 0.99f, endYRatio = 0.50f) {
+                    mainHandler.postDelayed({ tryClickUnpinNode() }, 180L)
+                }
+            } else {
+                mainHandler.postDelayed({ tryClickUnpinNode() }, 180L)
+            }
+        }, 300L)
         return true
     }
 
@@ -890,8 +905,24 @@ PENJELASAN: [Penjelasan singkat 1-2 kalimat]
      * Tangkap layar senyap (Android 11+) tanpa dialog "Bagikan layar".
      */
     fun captureRegionSilent(cropX: Int, cropY: Int, cropW: Int, cropH: Int, onFallback: () -> Unit) {
+        captureRegionSilentBitmap(cropX, cropY, cropW, cropH) { cropped ->
+            if (cropped != null) {
+                ScreenOcrProcessor.processCroppedBitmap(applicationContext, cropped)
+            } else {
+                onFallback()
+            }
+        }
+    }
+
+    fun captureRegionSilentBitmap(
+        cropX: Int,
+        cropY: Int,
+        cropW: Int,
+        cropH: Int,
+        onResult: (Bitmap?) -> Unit
+    ) {
         if (Build.VERSION.SDK_INT < Build.VERSION_CODES.R) {
-            onFallback()
+            onResult(null)
             return
         }
         mainHandler.postDelayed({
@@ -916,24 +947,24 @@ PENJELASAN: [Penjelasan singkat 1-2 kalimat]
                                     val safeH = cropH.coerceAtMost(softBitmap.height - safeY).coerceAtLeast(1)
                                     val cropped = Bitmap.createBitmap(softBitmap, safeX, safeY, safeW, safeH)
                                     softBitmap.recycle()
-                                    ScreenOcrProcessor.processCroppedBitmap(applicationContext, cropped)
+                                    onResult(cropped)
                                 } else {
-                                    onFallback()
+                                    onResult(null)
                                 }
                             } catch (e: Exception) {
                                 e.printStackTrace()
-                                onFallback()
+                                onResult(null)
                             }
                         }
 
                         override fun onFailure(errorCode: Int) {
-                            onFallback()
+                            onResult(null)
                         }
                     }
                 )
             } catch (e: Exception) {
                 e.printStackTrace()
-                onFallback()
+                onResult(null)
             }
         }, 120)
     }

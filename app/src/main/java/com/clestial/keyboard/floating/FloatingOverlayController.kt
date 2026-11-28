@@ -7,8 +7,10 @@ import android.content.ClipData
 import android.content.ClipboardManager
 import android.content.Context
 import android.content.Intent
+import android.graphics.Bitmap
 import android.graphics.Color
 import android.graphics.PixelFormat
+import android.net.Uri
 import android.os.Build
 import android.os.Handler
 import android.os.Looper
@@ -39,6 +41,7 @@ import android.widget.TextView
 import android.widget.Toast
 import androidx.appcompat.widget.AppCompatButton
 import androidx.appcompat.widget.SwitchCompat
+import androidx.core.content.FileProvider
 import com.clestial.keyboard.Prefs
 import com.clestial.keyboard.R
 import com.clestial.keyboard.autoanswer.AbcdSolutionResult
@@ -50,6 +53,8 @@ import com.clestial.keyboard.math.MathModule
 import com.clestial.keyboard.math.MathRegistry
 import com.clestial.keyboard.math.OfflineMathAssistant
 import com.clestial.keyboard.math.ScientificCalculator
+import java.io.File
+import java.io.FileOutputStream
 import java.net.URLEncoder
 import kotlin.math.abs
 
@@ -539,11 +544,11 @@ class FloatingOverlayController(private val host: OverlayWindowHost) {
             val cropW = boxFrame.width
             val cropH = boxFrame.height
 
-            hideSelectionBox()
+            removeSelectionBoxOverlay()
 
             fun launchMediaProjection() {
                 val captureIntent = Intent(context, ScreenCaptureActivity::class.java).apply {
-                    flags = Intent.FLAG_ACTIVITY_NEW_TASK
+                    flags = Intent.FLAG_ACTIVITY_NEW_TASK or Intent.FLAG_GRANT_READ_URI_PERMISSION
                     putExtra(ScreenCaptureActivity.EXTRA_CROP_X, cropX)
                     putExtra(ScreenCaptureActivity.EXTRA_CROP_Y, cropY)
                     putExtra(ScreenCaptureActivity.EXTRA_CROP_W, cropW)
@@ -554,16 +559,75 @@ class FloatingOverlayController(private val host: OverlayWindowHost) {
 
             val accService = AutoScannerService.instance
             if (accService != null && Build.VERSION.SDK_INT >= Build.VERSION_CODES.R) {
-                accService.captureRegionSilent(cropX, cropY, cropW, cropH) {
-                    mainHandler.post { launchMediaProjection() }
+                accService.captureRegionSilentBitmap(cropX, cropY, cropW, cropH) { cropped ->
+                    accService.forceUnpinSystem()
+                    mainHandler.postDelayed({
+                        if (cropped != null) {
+                            val lensUri = saveBitmapForLens(cropped)
+                            if (lensUri == null || !launchGoogleLensIntent(lensUri)) {
+                                ScreenOcrProcessor.processCroppedBitmap(context, cropped)
+                            }
+                        } else {
+                            launchMediaProjection()
+                        }
+                    }, 500L)
                 }
             } else {
-                launchMediaProjection()
+                accService?.forceUnpinSystem()
+                mainHandler.postDelayed({
+                    launchMediaProjection()
+                }, 500L)
             }
         }
 
         selectionBoxView = boxRoot
         selectionBoxParams = params
+    }
+
+    private fun removeSelectionBoxOverlay() {
+        selectionBoxView?.let { v ->
+            if (v.isAttachedToWindow) {
+                host.removeOverlayView(v)
+            }
+            v.visibility = View.GONE
+        }
+        selectionBoxView = null
+        selectionBoxParams = null
+        isBoxShowing = false
+    }
+
+    private fun saveBitmapForLens(bitmap: Bitmap): Uri? {
+        return try {
+            val dir = File(context.cacheDir, "shared").apply { mkdirs() }
+            val outFile = File(dir, "crop_lens.png")
+            FileOutputStream(outFile).use { fos ->
+                bitmap.compress(Bitmap.CompressFormat.PNG, 95, fos)
+            }
+            FileProvider.getUriForFile(context, "${context.packageName}.fileprovider", outFile)
+        } catch (_: Exception) {
+            null
+        }
+    }
+
+    private fun launchGoogleLensIntent(imageUri: Uri): Boolean {
+        val candidatePackages = listOf("com.google.ar.lens", "com.google.android.googlequicksearchbox")
+        for (pkg in candidatePackages) {
+            val lensIntent = Intent(Intent.ACTION_SEND).apply {
+                type = "image/png"
+                putExtra(Intent.EXTRA_STREAM, imageUri)
+                setPackage(pkg)
+                addFlags(Intent.FLAG_ACTIVITY_NEW_TASK or Intent.FLAG_GRANT_READ_URI_PERMISSION)
+            }
+            if (context.packageManager.resolveActivity(lensIntent, 0) != null) {
+                return try {
+                    context.startActivity(lensIntent)
+                    true
+                } catch (_: Exception) {
+                    false
+                }
+            }
+        }
+        return false
     }
 
     fun showSelectionBox() {
