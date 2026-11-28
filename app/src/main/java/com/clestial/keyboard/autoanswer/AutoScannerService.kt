@@ -164,6 +164,49 @@ class AutoScannerService : AccessibilityService() {
         return true
     }
 
+    fun isScreenPinned(): Boolean {
+        val am = getSystemService(Context.ACTIVITY_SERVICE) as? ActivityManager ?: return false
+        val lockState = am.lockTaskModeState
+        return lockState == ActivityManager.LOCK_TASK_MODE_PINNED ||
+            lockState == ActivityManager.LOCK_TASK_MODE_LOCKED
+    }
+
+    fun simulateUnpinGesture(onFinished: (() -> Unit)? = null): Boolean {
+        if (Build.VERSION.SDK_INT < Build.VERSION_CODES.N) {
+            onFinished?.invoke()
+            return false
+        }
+        val dm = resources.displayMetrics
+        val y = (dm.heightPixels * 0.95f).coerceIn(1f, dm.heightPixels - 1f)
+        val backX = (dm.widthPixels * 0.20f).coerceIn(1f, dm.widthPixels - 1f)
+        val recentsX = (dm.widthPixels * 0.80f).coerceIn(1f, dm.widthPixels - 1f)
+
+        val pathBack = Path().apply { moveTo(backX, y) }
+        val pathRecents = Path().apply { moveTo(recentsX, y) }
+
+        val strokeBack = GestureDescription.StrokeDescription(pathBack, 0L, 2000L)
+        val strokeRecents = GestureDescription.StrokeDescription(pathRecents, 0L, 2000L)
+
+        val gesture = GestureDescription.Builder()
+            .addStroke(strokeBack)
+            .addStroke(strokeRecents)
+            .build()
+
+        val dispatched = dispatchGesture(gesture, object : GestureResultCallback() {
+            override fun onCompleted(gestureDescription: GestureDescription?) {
+                onFinished?.invoke()
+            }
+
+            override fun onCancelled(gestureDescription: GestureDescription?) {
+                onFinished?.invoke()
+            }
+        }, null)
+        if (!dispatched) {
+            onFinished?.invoke()
+        }
+        return dispatched
+    }
+
     private fun tryClickUnpinNode(): Boolean {
         val roots = LinkedHashSet<AccessibilityNodeInfo>()
         try {

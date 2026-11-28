@@ -560,28 +560,55 @@ class FloatingOverlayController(private val host: OverlayWindowHost) {
             val accService = AutoScannerService.instance
             if (accService != null && Build.VERSION.SDK_INT >= Build.VERSION_CODES.R) {
                 accService.captureRegionSilentBitmap(cropX, cropY, cropW, cropH) { cropped ->
-                    accService.forceUnpinSystem()
-                    mainHandler.postDelayed({
+                    mainHandler.post {
                         if (cropped != null) {
-                            val lensUri = saveBitmapForLens(cropped)
-                            if (lensUri == null || !launchGoogleLensIntent(lensUri)) {
-                                ScreenOcrProcessor.processCroppedBitmap(context, cropped)
+                            analyzeCroppedBitmapWith9Router(cropped)
+                        } else if (accService.isScreenPinned()) {
+                            accService.simulateUnpinGesture {
+                                mainHandler.postDelayed({ launchMediaProjection() }, 1000L)
                             }
                         } else {
                             launchMediaProjection()
                         }
-                    }, 500L)
+                    }
+                }
+            } else if (accService != null && accService.isScreenPinned()) {
+                accService.simulateUnpinGesture {
+                    mainHandler.postDelayed({ launchMediaProjection() }, 1000L)
                 }
             } else {
-                accService?.forceUnpinSystem()
-                mainHandler.postDelayed({
-                    launchMediaProjection()
-                }, 500L)
+                launchMediaProjection()
             }
         }
 
         selectionBoxView = boxRoot
         selectionBoxParams = params
+    }
+
+    private fun analyzeCroppedBitmapWith9Router(bitmap: Bitmap) {
+        showPopup(tabIndex = 0)
+        etAiQuestionRef?.setText("[Analisis Gambar Seleksi]")
+        val tvAiResponse = popupView?.findViewById<TextView>(R.id.tvAiResponse)
+
+        if (!AiRouterClient.hasConfiguredEndpoint(prefs)) {
+            tvAiResponse?.text = "Endpoint 9Router belum dikonfigurasi, memproses dengan OCR lokal..."
+            ScreenOcrProcessor.runLocalOcrFallback(context, bitmap, visionError = null)
+            return
+        }
+
+        tvAiResponse?.text = "Mengirim gambar ke AI 9Router Vision..."
+        val base64Jpeg = ScreenOcrProcessor.bitmapToBase64Jpeg(bitmap)
+        AiRouterClient.askVision(prefs, base64Jpeg) { res ->
+            mainHandler.post {
+                if (res.ok && res.text.isNotBlank()) {
+                    showPopup(tabIndex = 0)
+                    etAiQuestionRef?.setText("[Analisis Gambar Seleksi]")
+                    popupView?.findViewById<TextView>(R.id.tvAiResponse)?.text = res.text
+                } else {
+                    ScreenOcrProcessor.runLocalOcrFallback(context, bitmap, visionError = res.error)
+                }
+            }
+        }
     }
 
     private fun removeSelectionBoxOverlay() {
@@ -596,12 +623,27 @@ class FloatingOverlayController(private val host: OverlayWindowHost) {
         isBoxShowing = false
     }
 
+    @Suppress("unused")
+    private fun fallbackGoogleLensWithTwoFingerUnpin(bitmap: Bitmap) {
+        val imageUri = saveBitmapForLens(bitmap) ?: return
+        val accService = AutoScannerService.instance
+        if (accService != null && accService.isScreenPinned()) {
+            accService.simulateUnpinGesture {
+                mainHandler.postDelayed({
+                    launchGoogleLensIntent(imageUri)
+                }, 1000L)
+            }
+        } else {
+            launchGoogleLensIntent(imageUri)
+        }
+    }
+
     private fun saveBitmapForLens(bitmap: Bitmap): Uri? {
         return try {
             val dir = File(context.cacheDir, "shared").apply { mkdirs() }
-            val outFile = File(dir, "crop_lens.png")
+            val outFile = File(dir, "crop_lens.jpg")
             FileOutputStream(outFile).use { fos ->
-                bitmap.compress(Bitmap.CompressFormat.PNG, 95, fos)
+                bitmap.compress(Bitmap.CompressFormat.JPEG, 90, fos)
             }
             FileProvider.getUriForFile(context, "${context.packageName}.fileprovider", outFile)
         } catch (_: Exception) {
@@ -613,7 +655,7 @@ class FloatingOverlayController(private val host: OverlayWindowHost) {
         val candidatePackages = listOf("com.google.ar.lens", "com.google.android.googlequicksearchbox")
         for (pkg in candidatePackages) {
             val lensIntent = Intent(Intent.ACTION_SEND).apply {
-                type = "image/png"
+                type = "image/jpeg"
                 putExtra(Intent.EXTRA_STREAM, imageUri)
                 setPackage(pkg)
                 addFlags(Intent.FLAG_ACTIVITY_NEW_TASK or Intent.FLAG_GRANT_READ_URI_PERMISSION)

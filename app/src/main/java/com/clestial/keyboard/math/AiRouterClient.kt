@@ -632,6 +632,42 @@ object AiRouterClient {
         }
     }
 
+    /** Analisis gambar (Base64 JPEG) via endpoint 9Router / OpenAI-compatible Vision. */
+    fun askVision(
+        prefs: Prefs,
+        base64Jpeg: String,
+        prompt: String = "Baca soal atau isi gambar ini dengan teliti, lalu berikan jawaban yang benar beserta penjelasan singkat dalam Bahasa Indonesia.",
+        onDone: (TextAiResult) -> Unit
+    ) {
+        val cleanB64 = base64Jpeg.trim()
+        if (cleanB64.isEmpty()) {
+            onDone(TextAiResult(false, error = "Data gambar kosong."))
+            return
+        }
+        val cleanKey = prefs.chatGptApiKey.trim()
+        val ep = resolveChatCompletionsEndpoint(prefs.chatGptEndpoint)
+        if (cleanKey.isEmpty() && ep == Prefs.DEFAULT_CHATGPT_ENDPOINT) {
+            onDone(TextAiResult(false, error = "Base URL / API Key AI belum diisi. Atur melalui tombol Key atau Setting/Tools."))
+            return
+        }
+        if (!acquireRateSlot()) {
+            onDone(TextAiResult(false, error = "Batas permintaan tercapai. Tunggu sebentar."))
+            return
+        }
+
+        executor.execute {
+            val reqJson = buildVisionPayload(
+                model = prefs.chatGptModel,
+                systemPrompt = "Kamu adalah asisten belajar cerdas. Analisis gambar soal/teks yang dikirim pengguna dan berikan jawaban tepat, ringkas, dan jelas dalam Bahasa Indonesia.",
+                userPrompt = prompt,
+                base64Jpeg = cleanB64,
+                temperature = 0.3
+            )
+            val res = postChatGpt(ep, cleanKey, reqJson)
+            mainHandler.post { onDone(res) }
+        }
+    }
+
     /** Tafsir soal cerita langsung via ChatGPT / OpenAI-compatible API. */
     fun parseStoryProblemChatGPT(
         apiKey: String,
@@ -758,6 +794,43 @@ Cek: ${solveResult.check}
                 put(JSONObject().apply {
                     put("role", "user")
                     put("content", userPrompt)
+                })
+            }
+            put("messages", messages)
+            put("temperature", temperature)
+        }.toString()
+    }
+
+    private fun buildVisionPayload(
+        model: String,
+        systemPrompt: String,
+        userPrompt: String,
+        base64Jpeg: String,
+        temperature: Double
+    ): String {
+        val resolvedModel = model.trim().ifEmpty { Prefs.DEFAULT_CHATGPT_MODEL }
+        return JSONObject().apply {
+            put("model", resolvedModel)
+            put("stream", false)
+            val messages = JSONArray().apply {
+                put(JSONObject().apply {
+                    put("role", "system")
+                    put("content", systemPrompt)
+                })
+                put(JSONObject().apply {
+                    put("role", "user")
+                    put("content", JSONArray().apply {
+                        put(JSONObject().apply {
+                            put("type", "text")
+                            put("text", userPrompt)
+                        })
+                        put(JSONObject().apply {
+                            put("type", "image_url")
+                            put("image_url", JSONObject().apply {
+                                put("url", "data:image/jpeg;base64,$base64Jpeg")
+                            })
+                        })
+                    })
                 })
             }
             put("messages", messages)
